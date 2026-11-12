@@ -13,7 +13,7 @@ Building a Version Control System from scratch using raw file-copying snapshots 
 1. **Isolated VCS Database (`--git-dir=.kaye`):** Every command run through `kaye` redirects Git's internal database (objects, refs, staging index, and commit logs) into a hidden `.kaye/` directory at your project root. Your primary `.git/` repository remains completely untouched while you experiment.
 2. **Shared Working Tree (`--work-tree=.`):** While the version control database is isolated inside `.kaye/`, the working tree points directly to your project root so `kaye` can track, diff, branch, and restore your source files in place.
 3. **Automatic Mutual Exclusion:** Running `kaye init` configures `.kaye/info/exclude` to ignore both `.kaye/` and `.git/`, and automatically appends `.kaye/` to your project's `.gitignore` so sandbox data never leaks into production commits.
-4. **Human-Readable Checkpoint Resolution:** Under the hood, `.kaye/` stores commits using standard Git SHA-1 hashes. KAYE provides a built-in Rust translation layer (`kaye list`, `kaye restore-num`, and `kaye restore-msg`) that maps sequential numbers (`[1]`, `[2]`, `[3]`) and commit message keywords directly to their underlying SHA-1 hashes.
+4. **Human-Readable Checkpoint Resolution:** Under the hood, `.kaye/` stores commits using standard Git SHA-1 hashes. KAYE provides a built-in Rust translation layer (`kaye list`, `kaye what change`, `kaye restore-num`, and `kaye restore-msg`) that maps sequential numbers (`[1]`, `[2]`, `[3]`) and commit message keywords directly to their underlying SHA-1 hashes.
 5. **100% Offline Enforcement:** Network operations (`remote`, `fetch`, `pull`, `clone`, `submodule`) are blocked at the binary level so the sandbox remains strictly local.
 
 ---
@@ -69,16 +69,18 @@ Or re-run `./install.sh` (Linux/macOS) or `.\install.ps1` (Windows) to overwrite
 
 ### Custom KAYE Commands
 
-| Command | Description |
-| :--- | :--- |
-| `kaye init` | Initializes the `.kaye/` sandbox repository in the project root and adds `.kaye/` to `.gitignore`. |
-| `kaye save "<message>"` | Stages all changes (`add -A`) and records a checkpoint commit inside `.kaye/`. A commit message is required (cannot be empty). |
-| `kaye list` | Lists all recorded checkpoints in chronological order as sequential numbers (`[1]`, `[2]`, `[3]`). |
-| `kaye restore-num <number>` | Hard-resets the working tree to the checkpoint matching `<number>` from `kaye list`. |
-| `kaye restore-msg "<keyword>"` | Searches commit messages (case-insensitive) and hard-resets the working tree to the latest checkpoint matching `<keyword>`. |
-| `kaye undo` | Reverts the working tree back by 1 checkpoint (`reset --hard HEAD~1`). |
-| `kaye push "<message>"` / `kaye push -` | Promotes the current working tree state into 1 clean commit on the active branch of the primary `.git` repository. Using `-` automatically reuses the latest checkpoint message from `.kaye/`. |
-| `kaye remove` / `kaye rm` | Removes the `.kaye/` sandbox directory and all checkpoints with interactive `[y/N]` confirmation. |
+| Command | Shortcut | Description |
+| :--- | :--- | :--- |
+| `kaye init` | — | Initializes the `.kaye/` sandbox repository in the project root and adds `.kaye/` to `.gitignore`. |
+| `kaye save "<message>"` | `kaye s "<msg>"` | Stages all changes (`add -A`) and records a checkpoint commit inside `.kaye/`. A commit message is required (cannot be empty). |
+| `kaye list` | `kaye l` | Lists all recorded checkpoints in chronological order as sequential numbers (`[1]`, `[2]`, `[3]`). |
+| `kaye what change` | `kaye w c` / `kaye wc` | Shows line-by-line patch diffs of recent checkpoints (`log -p`). Supports `<N>`, `all`, and `+` (e.g. `kaye w c 2`, `kaye w c all +`). By default, newest changes are shown at the bottom. |
+| `kaye change message <number> "<new message>"` | `kaye c m` / `kaye cm` | Updates the commit message of checkpoint `<number>` (e.g. `kaye c m 3 "new message"`). |
+| `kaye restore-num <number>` | `kaye rn <number>` | Hard-resets the working tree to the checkpoint matching `<number>` from `kaye list`. |
+| `kaye restore-msg "<keyword>"` | `kaye rmsg "<keyword>"` | Searches commit messages (case-insensitive) and hard-resets the working tree to the latest checkpoint matching `<keyword>`. |
+| `kaye undo` | `kaye u` | Reverts the working tree back by 1 checkpoint (`reset --hard HEAD~1`). |
+| `kaye push "<message>"` / `kaye push -` | `kaye p "<msg>"` / `kaye p -` | Promotes the current working tree state into 1 clean commit on the active branch of the primary `.git` repository. Using `-` automatically reuses the latest checkpoint message from `.kaye/`. |
+| `kaye remove` | `kaye rm` | Removes the `.kaye/` sandbox directory and all checkpoints with interactive `[y/N]` confirmation. |
 
 ### Standard Git Commands (Isolated Inside `.kaye/`)
 
@@ -115,7 +117,7 @@ kaye save "experimental sqlite session handler"
 # 4. View all line-by-line changes across the last 2 checkpoints
 kaye diff HEAD~2
 
-# 5. View numbered checkpoint history
+# 5. View numbered checkpoint history and diff patches
 kaye list
 # Output:
 # === KAYE EXPERIMENT CHECKPOINTS ===
@@ -123,6 +125,12 @@ kaye list
 #   [2] add token validation logic
 #   [3] experimental sqlite session handler (HEAD)
 # ===================================
+
+# Inspect exact commit patches (newest at bottom by default)
+kaye what change        # Show patch of latest checkpoint
+kaye what change 2      # Show patches of last 2 checkpoints
+kaye what change all    # Show patches of all checkpoints
+kaye what change 2 +    # Show patches of last 2 checkpoints with newest at top
 
 # 6. Roll back if the latest experiments broke the build
 # Option A: Restore by checkpoint number

@@ -41,6 +41,8 @@ Save a checkpoint after completing each logical change, file modification, or pa
 
 ~~~bash
 kaye save "<clear, concise description of the change>"
+# Or use the shortcut:
+kaye s "<clear, concise description of the change>"
 ~~~
 
 ### Step 3: Inspecting Multi-File Diffs and History
@@ -53,13 +55,31 @@ kaye status
 ~~~bash
 kaye diff
 ~~~
+- To inspect checkpoint patch diffs (default: 1 recent checkpoint, newest changes at bottom):
+~~~bash
+# Inspect patch of latest checkpoint (newest changes at bottom)
+kaye what change       # or: kaye w c
+
+# Inspect patches across last N checkpoints
+kaye what change <N>   # or: kaye w c <N>
+
+# Inspect patches across all checkpoints
+kaye what change all   # or: kaye w c all
+
+# Inspect with newest changes at top (normal git order)
+kaye what change <N> + # or: kaye w c <N> +
+~~~
 - To inspect accumulated line-by-line changes across the last `N` checkpoints:
 ~~~bash
 kaye diff HEAD~N
 ~~~
 - To view the sequential numbered list of saved checkpoints (`[1]`, `[2]`, `[3]`, ...):
 ~~~bash
-kaye list
+kaye list              # or: kaye l
+~~~
+- To change or update the message of an existing checkpoint by its number:
+~~~bash
+kaye change message <number> "<new message>"  # or: kaye c m <number> "<new message>"
 ~~~
 
 ### Step 4: Experimental Branching (Optional)
@@ -87,15 +107,15 @@ kaye restore .
 ~~~
 - **Revert 1 checkpoint back:**
 ~~~bash
-kaye undo
+kaye undo               # or: kaye u
 ~~~
 - **Revert to a specific checkpoint number from `kaye list`:**
 ~~~bash
-kaye restore-num <number>
+kaye restore-num <number> # or: kaye rn <number>
 ~~~
 - **Revert to a specific checkpoint by matching a keyword in its commit message:**
 ~~~bash
-kaye restore-msg "<keyword>"
+kaye restore-msg "<keyword>" # or: kaye rmsg "<keyword>"
 ~~~
 
 ### Step 6: Promoting Final Code to Primary `.git`
@@ -104,10 +124,10 @@ Only when the implementation is complete, builds/tests pass, and the user asks t
 
 ~~~bash
 # Option A: Specify a custom commit message
-kaye push "<clean commit message for main git>"
+kaye push "<clean commit message for main git>"  # or: kaye p "<msg>"
 
 # Option B: Reuse the latest checkpoint message from .kaye
-kaye push -
+kaye push -                                      # or: kaye p -
 ~~~
 
 `kaye push` synchronizes the final state and records a single clean commit on the currently active branch in the primary `.git` repository. Passing `-` automatically extracts and reuses the commit message from the latest checkpoint (`HEAD`) in `.kaye/`.

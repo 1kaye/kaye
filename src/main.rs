@@ -2,7 +2,7 @@ use std::env;
 use std::fs::{self, OpenOptions};
 use std::io::{self, IsTerminal, Write};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio, exit};
+use std::process::{exit, Command, Stdio};
 
 const KAYE_DIR: &str = ".kaye";
 
@@ -50,20 +50,62 @@ fn append_unique_line(file_path: &Path, entry: &str) -> std::io::Result<bool> {
 
 const GIT_SUBCMDS: &[&str] = &[
     // Core & Status
-    "add", "commit", "status", "diff", "log", "show", "init", "config",
+    "add",
+    "commit",
+    "status",
+    "diff",
+    "log",
+    "show",
+    "init",
+    "config",
     // Branching & Merging
-    "branch", "checkout", "switch", "merge", "rebase", "cherry-pick", "revert", "bisect",
+    "branch",
+    "checkout",
+    "switch",
+    "merge",
+    "rebase",
+    "cherry-pick",
+    "revert",
+    "bisect",
     // Working tree
-    "restore", "reset", "rm", "mv", "clean", "stash",
+    "restore",
+    "reset",
+    "rm",
+    "mv",
+    "clean",
+    "stash",
     // References
-    "tag", "reflog", "show-ref", "symbolic-ref", "rev-parse", "rev-list", "name-rev",
-    "merge-base", "describe",
+    "tag",
+    "reflog",
+    "show-ref",
+    "symbolic-ref",
+    "rev-parse",
+    "rev-list",
+    "name-rev",
+    "merge-base",
+    "describe",
     // Inspection & Files
-    "blame", "grep", "shortlog", "whatchanged", "ls-files", "ls-tree", "cat-file",
+    "blame",
+    "grep",
+    "shortlog",
+    "whatchanged",
+    "ls-files",
+    "ls-tree",
+    "cat-file",
     // Diff & Patch
-    "diff-tree", "diff-files", "diff-index", "format-patch", "apply", "am",
+    "diff-tree",
+    "diff-files",
+    "diff-index",
+    "format-patch",
+    "apply",
+    "am",
     // Metadata & Verification
-    "notes", "check-ignore", "check-attr", "check-mailmap", "verify-commit", "verify-tag",
+    "notes",
+    "check-ignore",
+    "check-attr",
+    "check-mailmap",
+    "verify-commit",
+    "verify-tag",
     "archive",
 ];
 
@@ -79,13 +121,28 @@ fn rewrite_git_command_references(line: &str) -> String {
         text = text.replace(&format!("\"git {} ", sc), &format!("\"kaye {} ", sc));
 
         // 2. Parenthesized suggestions: (use "git <cmd>...", (use 'git <cmd>...'
-        text = text.replace(&format!("(use \"git {} ", sc), &format!("(use \"kaye {} ", sc));
-        text = text.replace(&format!("(use 'git {} ", sc), &format!("(use 'kaye {} ", sc));
-        text = text.replace(&format!("(use \"git {}\"", sc), &format!("(use \"kaye {}\"", sc));
-        text = text.replace(&format!("(use 'git {}'", sc), &format!("(use 'kaye {}'", sc));
+        text = text.replace(
+            &format!("(use \"git {} ", sc),
+            &format!("(use \"kaye {} ", sc),
+        );
+        text = text.replace(
+            &format!("(use 'git {} ", sc),
+            &format!("(use 'kaye {} ", sc),
+        );
+        text = text.replace(
+            &format!("(use \"git {}\"", sc),
+            &format!("(use \"kaye {}\"", sc),
+        );
+        text = text.replace(
+            &format!("(use 'git {}'", sc),
+            &format!("(use 'kaye {}'", sc),
+        );
 
         // 3. See git-<cmd>(1) manual references -> Run 'kaye <cmd> --help'
-        text = text.replace(&format!("See git-{}(1)", sc), &format!("Run 'kaye {} --help'", sc));
+        text = text.replace(
+            &format!("See git-{}(1)", sc),
+            &format!("Run 'kaye {} --help'", sc),
+        );
         text = text.replace(&format!("git-{}(1)", sc), &format!("kaye-{}", sc));
 
         // 4. Lines starting with command or indented code blocks (with or without trailing space)
@@ -108,17 +165,38 @@ fn rewrite_git_command_references(line: &str) -> String {
         }
 
         // 5. Usage & syntax lines: "usage: git <cmd>", "   or: git <cmd>"
-        text = text.replace(&format!("usage: git {}", sc), &format!("usage: kaye {}", sc));
-        text = text.replace(&format!("   or: git {}", sc), &format!("   or: kaye {}", sc));
-        text = text.replace(&format!("   or:  git {}", sc), &format!("   or:  kaye {}", sc));
+        text = text.replace(
+            &format!("usage: git {}", sc),
+            &format!("usage: kaye {}", sc),
+        );
+        text = text.replace(
+            &format!("   or: git {}", sc),
+            &format!("   or: kaye {}", sc),
+        );
+        text = text.replace(
+            &format!("   or:  git {}", sc),
+            &format!("   or:  kaye {}", sc),
+        );
 
         // 6. Instruction phrases like "run 'git <cmd> ...'", "with 'git <cmd> ...'"
         text = text.replace(&format!("run 'git {} ", sc), &format!("run 'kaye {} ", sc));
-        text = text.replace(&format!("run \"git {} ", sc), &format!("run \"kaye {} ", sc));
-        text = text.replace(&format!("with 'git {} ", sc), &format!("with 'kaye {} ", sc));
-        text = text.replace(&format!("with \"git {} ", sc), &format!("with \"kaye {} ", sc));
+        text = text.replace(
+            &format!("run \"git {} ", sc),
+            &format!("run \"kaye {} ", sc),
+        );
+        text = text.replace(
+            &format!("with 'git {} ", sc),
+            &format!("with 'kaye {} ", sc),
+        );
+        text = text.replace(
+            &format!("with \"git {} ", sc),
+            &format!("with \"kaye {} ", sc),
+        );
         text = text.replace(&format!("run 'git {}'", sc), &format!("run 'kaye {}'", sc));
-        text = text.replace(&format!("run \"git {}\"", sc), &format!("run \"kaye {}\"", sc));
+        text = text.replace(
+            &format!("run \"git {}\"", sc),
+            &format!("run \"kaye {}\"", sc),
+        );
 
         // 7. General standalone command occurrences: " git <cmd> " or " git <cmd>"
         text = text.replace(&format!(" git {} ", sc), &format!(" kaye {} ", sc));
@@ -153,7 +231,10 @@ fn filter_kaye_output(raw: &str) -> String {
         // 2. Specific case: kaye add without arguments
         if trimmed == "hint: Maybe you wanted to say 'git add .'?" {
             result.push("hint: Maybe you wanted to say 'kaye add .'?".to_string());
-            result.push("hint: Or use 'kaye save \"<message>\"' to stage and commit all changes.".to_string());
+            result.push(
+                "hint: Or use 'kaye save \"<message>\"' to stage and commit all changes."
+                    .to_string(),
+            );
             continue;
         }
 
@@ -217,26 +298,14 @@ fn filter_kaye_output(raw: &str) -> String {
                 "git switch -c <new-branch-name>",
                 "kaye checkout -b <new-branch-name>",
             ),
-            (
-                "git switch -",
-                "kaye checkout -",
-            ),
-            (
-                "git switch ",
-                "kaye checkout ",
-            ),
+            ("git switch -", "kaye checkout -"),
+            ("git switch ", "kaye checkout "),
             (
                 "did not match any file(s) known to git",
                 "did not match any file(s) known to kaye",
             ),
-            (
-                "known to git",
-                "known to kaye",
-            ),
-            (
-                "not tracked by git",
-                "not tracked by kaye",
-            ),
+            ("known to git", "known to kaye"),
+            ("not tracked by git", "not tracked by kaye"),
         ];
 
         for (from, to) in replacements {
@@ -314,7 +383,10 @@ fn run_kaye_git(root_dir: &Path, args: &[&str], inherit_io: bool) -> i32 {
 fn cmd_init(current_dir: &Path) {
     let kaye_path = current_dir.join(KAYE_DIR);
     if let Err(e) = fs::create_dir_all(&kaye_path) {
-        eprintln!("[kaye error] Failed to create {} directory: {}", KAYE_DIR, e);
+        eprintln!(
+            "[kaye error] Failed to create {} directory: {}",
+            KAYE_DIR, e
+        );
         exit(1);
     }
 
@@ -407,8 +479,10 @@ fn cmd_save(root_dir: &Path, args: &[String]) {
 
     let commit_code = run_kaye_git(root_dir, &["commit", "-m", msg], true);
     if commit_code == 0 {
-        println!("[kaye] Checkpoint recorded locally in .kaye/ sandbox (main .git is untouched).");
+        println!("[kaye] Success! Checkpoint recorded locally in .kaye/ sandbox (main .git is untouched).");
         println!("[kaye tip] You can save/commit as many local experiments as you want!");
+    } else {
+        println!("[kaye] No changes detected to save. Working tree is clean.");
     }
     exit(commit_code);
 }
@@ -417,10 +491,8 @@ fn cmd_save(root_dir: &Path, args: &[String]) {
 fn cmd_status(root_dir: &Path, args: &[String]) {
     // Pass machine-readable/compact flags directly to git without custom headers
     let is_compact = args.iter().any(|a| {
-        matches!(
-            a.as_str(),
-            "-s" | "--short" | "--porcelain" | "-z"
-        ) || a.starts_with("--porcelain=")
+        matches!(a.as_str(), "-s" | "--short" | "--porcelain" | "-z")
+            || a.starts_with("--porcelain=")
     });
 
     if is_compact {
@@ -524,7 +596,9 @@ fn cmd_commit(root_dir: &Path, args: &[String]) {
     let code = run_kaye_git(root_dir, &git_args, true);
     if code == 0 {
         println!("[kaye] Committed locally in .kaye/ sandbox (main .git is untouched).");
-        println!("[kaye tip] Checkpoints are 100% local. Run 'kaye push \"<msg>\"' only when finalized.");
+        println!(
+            "[kaye tip] Checkpoints are 100% local. Run 'kaye push \"<msg>\"' only when finalized."
+        );
     }
     exit(code);
 }
@@ -560,7 +634,9 @@ fn cmd_switch(root_dir: &Path, args: &[String]) {
     let code = run_kaye_git(root_dir, &git_args, true);
     if code == 0 && is_new_branch {
         println!("[kaye] Experimental branch active locally inside .kaye/ sandbox.");
-        println!("[kaye tip] You can commit freely here without affecting other branches or main .git.");
+        println!(
+            "[kaye tip] You can commit freely here without affecting other branches or main .git."
+        );
     }
     exit(code);
 }
@@ -575,7 +651,9 @@ fn cmd_checkout(root_dir: &Path, args: &[String]) {
     let code = run_kaye_git(root_dir, &git_args, true);
     if code == 0 && is_new_branch {
         println!("[kaye] Experimental branch active locally inside .kaye/ sandbox.");
-        println!("[kaye tip] You can commit freely here without affecting other branches or main .git.");
+        println!(
+            "[kaye tip] You can commit freely here without affecting other branches or main .git."
+        );
     }
     exit(code);
 }
@@ -590,7 +668,10 @@ fn cmd_branch(root_dir: &Path, args: &[String]) {
     let code = run_kaye_git(root_dir, &git_args, true);
     if code == 0 && is_creating {
         println!("[kaye] Created local sandbox branch '{}'.", args[0]);
-        println!("[kaye tip] Switch to it with 'kaye checkout {}' to start an isolated experiment.", args[0]);
+        println!(
+            "[kaye tip] Switch to it with 'kaye checkout {}' to start an isolated experiment.",
+            args[0]
+        );
     }
     exit(code);
 }
@@ -610,7 +691,10 @@ fn cmd_merge(root_dir: &Path, args: &[String]) {
     }
     let code = run_kaye_git(root_dir, &git_args, true);
     if code == 0 {
-        println!("[kaye] Successfully merged '{}' locally in .kaye/ sandbox.", branch_name);
+        println!(
+            "[kaye] Successfully merged '{}' locally in .kaye/ sandbox.",
+            branch_name
+        );
         println!("[kaye tip] This merge is 100% local. Main .git is untouched until you run 'kaye push \"<msg>\".");
     }
     exit(code);
@@ -631,7 +715,10 @@ fn cmd_rebase(root_dir: &Path, args: &[String]) {
     }
     let code = run_kaye_git(root_dir, &git_args, true);
     if code == 0 {
-        println!("[kaye] Successfully rebased against '{}' locally in .kaye/ sandbox.", branch_name);
+        println!(
+            "[kaye] Successfully rebased against '{}' locally in .kaye/ sandbox.",
+            branch_name
+        );
         println!("[kaye tip] Rebase is 100% local. Main .git is untouched until you run 'kaye push \"<msg>\".");
     }
     exit(code);
@@ -698,7 +785,7 @@ fn cmd_list(root_dir: &Path) {
                 return;
             }
 
-            println!("=== KAYE EXPERIMENT CHECKPOINTS ===");
+            println!("=== Keep All Your Experiments CHECKPOINTS ===");
             for (index, line) in lines.iter().enumerate() {
                 let parts: Vec<&str> = line.splitn(2, '|').collect();
                 if parts.len() == 2 {
@@ -708,7 +795,7 @@ fn cmd_list(root_dir: &Path) {
                     println!("  [{}] {}{}", num, msg, marker);
                 }
             }
-            println!("===================================");
+            println!("=============================================");
             println!(
                 "Use 'kaye restore-num <number>' or 'kaye restore-msg \"<keyword>\"' to jump back."
             );
@@ -856,6 +943,286 @@ fn cmd_restore_msg(root_dir: &Path, args: &[String]) {
     }
 }
 
+/// Parses arguments for `kaye what change [N|all] [+]`
+fn parse_what_change_args(args: &[String]) -> (Option<usize>, bool, Vec<String>) {
+    let mut count: Option<usize> = Some(1);
+    let mut reverse = true; // Default: newest at bottom
+    let mut extra = Vec::new();
+
+    for arg in args {
+        let trimmed = arg.trim();
+        if trimmed == "+" {
+            reverse = false; // '+' specifies newest at top
+        } else if trimmed.eq_ignore_ascii_case("all") {
+            count = None;
+        } else if let Ok(n) = trimmed.parse::<usize>() {
+            count = Some(n);
+        } else if trimmed.starts_with('-') && trimmed[1..].parse::<usize>().is_ok() {
+            count = Some(trimmed[1..].parse::<usize>().unwrap());
+        } else {
+            extra.push(trimmed.to_string());
+        }
+    }
+
+    (count, reverse, extra)
+}
+
+/// Shortcut: `kaye what change [N|all] [+]` -> views checkpoint diffs with newest at bottom by default
+fn cmd_what_change(root_dir: &Path, args: &[String]) {
+    if args.iter().any(|a| a == "--help" || a == "-h") {
+        println!("Show checkpoint diffs and commit patches in .kaye sandbox.\n");
+        println!("USAGE:");
+        println!("  kaye what change [N|all] [+]   (shortcut: kaye w c [N|all] [+])\n");
+        println!("OPTIONS:");
+        println!("  N       Number of recent checkpoints to show (default: 1)");
+        println!("  all     Show all checkpoints from beginning");
+        println!("  +       Display newest checkpoint at top (default is newest at bottom)\n");
+        println!("EXAMPLES:");
+        println!("  kaye what change       Show patch of latest checkpoint (newest at bottom)");
+        println!("  kaye w c 2             Show patches of last 2 checkpoints (shortcut)");
+        println!("  kaye what change all   Show patches of all checkpoints (newest at bottom)");
+        println!("  kaye w c 2 +           Show patches of last 2 checkpoints (newest at top)");
+        exit(0);
+    }
+
+    let kaye_dir = root_dir.join(KAYE_DIR);
+    let check = Command::new("git")
+        .arg(format!("--git-dir={}", kaye_dir.display()))
+        .arg(format!("--work-tree={}", root_dir.display()))
+        .args(["rev-parse", "--verify", "HEAD"])
+        .output();
+
+    if let Ok(out) = check {
+        if !out.status.success() {
+            println!(
+                "[kaye] No checkpoints recorded yet. Run 'kaye save \"<message>\"' to create one."
+            );
+            exit(0);
+        }
+    }
+
+    let (count, reverse, extra) = parse_what_change_args(args);
+
+    let mut git_args: Vec<String> = vec!["log".to_string(), "-p".to_string()];
+
+    if let Some(n) = count {
+        git_args.push(format!("-{}", n));
+    }
+
+    if reverse {
+        git_args.push("--reverse".to_string());
+    }
+
+    git_args.extend(extra);
+
+    let str_args: Vec<&str> = git_args.iter().map(|s| s.as_str()).collect();
+    let code = run_kaye_git(root_dir, &str_args, true);
+    exit(code);
+}
+
+/// Handles `kaye change message <number> "<new message>"`
+fn cmd_change_message(root_dir: &Path, args: &[String]) {
+    if args.iter().any(|a| a == "--help" || a == "-h") {
+        println!("Update the commit message of an existing checkpoint in .kaye sandbox.\n");
+        println!("USAGE:");
+        println!("  kaye change message <number> \"<new message>\"   (shortcut: kaye c m <number> \"<msg>\")\n");
+        println!("EXAMPLES:");
+        println!("  kaye change message 3 \"new message\"");
+        println!("  kaye c m 3 \"new message\"");
+        println!("  kaye cm 3 \"new message\"");
+        exit(0);
+    }
+
+    let mut target_num: Option<usize> = None;
+    let mut new_msg: Option<String> = None;
+
+    let mut iter = args.iter().peekable();
+    while let Some(arg) = iter.next() {
+        let trimmed = arg.trim();
+        if trimmed == "-m" {
+            if let Some(m) = iter.next() {
+                new_msg = Some(m.trim().to_string());
+            }
+        } else if trimmed.starts_with("-m=") {
+            new_msg = Some(trimmed["-m=".len()..].trim().to_string());
+        } else if target_num.is_none() && trimmed.parse::<usize>().is_ok() {
+            target_num = trimmed.parse::<usize>().ok();
+        } else if new_msg.is_none() {
+            new_msg = Some(trimmed.to_string());
+        }
+    }
+
+    let target_num = match target_num {
+        Some(n) => n,
+        None => {
+            eprintln!("[kaye error] Checkpoint number is required.");
+            eprintln!("Usage: kaye change message <number> \"<new message>\" (or: kaye c m <number> \"<msg>\")");
+            eprintln!("Example: kaye change message 3 \"new message\"");
+            exit(1);
+        }
+    };
+
+    let new_msg = match new_msg {
+        Some(m) if !m.is_empty() => m,
+        _ => {
+            print!("[kaye] Enter new message for checkpoint [{}]: ", target_num);
+            let _ = io::stdout().flush();
+            let mut input = String::new();
+            if io::stdin().read_line(&mut input).is_err() || input.trim().is_empty() {
+                eprintln!("\n[kaye error] Commit message cannot be empty.");
+                exit(1);
+            }
+            input.trim().to_string()
+        }
+    };
+
+    let kaye_dir = root_dir.join(KAYE_DIR);
+    let output = Command::new("git")
+        .arg(format!("--git-dir={}", kaye_dir.display()))
+        .arg(format!("--work-tree={}", root_dir.display()))
+        .args([
+            "log",
+            "--reverse",
+            "--format=%H%x1f%T%x1f%an%x1f%ae%x1f%ad%x1f%cn%x1f%ce%x1f%cd%x1f%s",
+        ])
+        .output();
+
+    let stdout = match output {
+        Ok(out) if out.status.success() => String::from_utf8_lossy(&out.stdout).to_string(),
+        _ => {
+            eprintln!("[kaye error] No checkpoints recorded yet.");
+            exit(1);
+        }
+    };
+
+    let records: Vec<&str> = stdout.lines().filter(|l| !l.trim().is_empty()).collect();
+    if records.is_empty() {
+        eprintln!("[kaye error] No checkpoints recorded yet.");
+        exit(1);
+    }
+
+    if target_num == 0 || target_num > records.len() {
+        eprintln!(
+            "[kaye error] Invalid checkpoint number [{}]. Available range: 1 to {}.",
+            target_num,
+            records.len()
+        );
+        exit(1);
+    }
+
+    struct CommitRecord {
+        hash: String,
+        tree: String,
+        an: String,
+        ae: String,
+        ad: String,
+        cn: String,
+        ce: String,
+        cd: String,
+        subject: String,
+    }
+
+    let mut commits = Vec::new();
+    for rec in &records {
+        let fields: Vec<&str> = rec.split('\x1f').collect();
+        if fields.len() >= 9 {
+            commits.push(CommitRecord {
+                hash: fields[0].to_string(),
+                tree: fields[1].to_string(),
+                an: fields[2].to_string(),
+                ae: fields[3].to_string(),
+                ad: fields[4].to_string(),
+                cn: fields[5].to_string(),
+                ce: fields[6].to_string(),
+                cd: fields[7].to_string(),
+                subject: fields[8].to_string(),
+            });
+        }
+    }
+
+    let target_idx = target_num - 1;
+    let old_msg = commits[target_idx].subject.clone();
+
+    // Determine parent for the first commit being rewritten
+    let mut current_parent = if target_idx > 0 {
+        Some(commits[target_idx - 1].hash.clone())
+    } else {
+        None
+    };
+
+    let mut new_head_hash = String::new();
+
+    // Replay commits from target_idx to end
+    for (i, c) in commits.iter().enumerate().skip(target_idx) {
+        let msg_to_use = if i == target_idx {
+            &new_msg
+        } else {
+            &c.subject
+        };
+
+        let mut cmd = Command::new("git");
+        cmd.arg(format!("--git-dir={}", kaye_dir.display()))
+            .arg(format!("--work-tree={}", root_dir.display()))
+            .arg("commit-tree")
+            .arg(&c.tree);
+
+        if let Some(ref p) = current_parent {
+            cmd.arg("-p").arg(p);
+        }
+
+        cmd.arg("-m").arg(msg_to_use);
+
+        cmd.env("GIT_AUTHOR_NAME", &c.an)
+            .env("GIT_AUTHOR_EMAIL", &c.ae)
+            .env("GIT_AUTHOR_DATE", &c.ad)
+            .env("GIT_COMMITTER_NAME", &c.cn)
+            .env("GIT_COMMITTER_EMAIL", &c.ce)
+            .env("GIT_COMMITTER_DATE", &c.cd);
+
+        let out = match cmd.output() {
+            Ok(o) if o.status.success() => o,
+            Ok(o) => {
+                eprintln!(
+                    "[kaye error] Failed to rewrite commit {}: {}",
+                    i + 1,
+                    String::from_utf8_lossy(&o.stderr)
+                );
+                exit(1);
+            }
+            Err(e) => {
+                eprintln!("[kaye error] Failed to execute git commit-tree: {}", e);
+                exit(1);
+            }
+        };
+
+        let commit_hash = String::from_utf8_lossy(&out.stdout).trim().to_string();
+        current_parent = Some(commit_hash.clone());
+        new_head_hash = commit_hash;
+    }
+
+    // Update HEAD ref to point to the rewritten tip
+    let update = Command::new("git")
+        .arg(format!("--git-dir={}", kaye_dir.display()))
+        .arg(format!("--work-tree={}", root_dir.display()))
+        .args(["update-ref", "HEAD", &new_head_hash])
+        .output();
+
+    match update {
+        Ok(out) if out.status.success() => {
+            println!(
+                "[kaye] Successfully updated checkpoint [{}] message:",
+                target_num
+            );
+            println!("  Old: \"{}\"", old_msg);
+            println!("  New: \"{}\"", new_msg);
+        }
+        _ => {
+            eprintln!("[kaye error] Failed to update HEAD reference in .kaye");
+            exit(1);
+        }
+    }
+}
+
 /// Promotes the final working state from `.kaye` into a single clean commit in the main `.git` repo
 fn cmd_push(root_dir: &Path, args: &[String]) {
     if !root_dir.join(".git").exists() {
@@ -869,7 +1236,9 @@ fn cmd_push(root_dir: &Path, args: &[String]) {
         [m, ..] => m.as_str(),
         [] => {
             eprintln!("Usage: kaye push \"<commit message>\" | kaye push -");
-            eprintln!("Info : Squashes your final working state into 1 clean commit in local .git.");
+            eprintln!(
+                "Info : Squashes your final working state into 1 clean commit in local .git."
+            );
             eprintln!("Tip  : Use '-' to reuse the latest checkpoint message from .kaye/.");
             exit(1);
         }
@@ -904,7 +1273,10 @@ fn cmd_push(root_dir: &Path, args: &[String]) {
             exit(1);
         }
 
-        println!("[kaye] Using latest checkpoint message: \"{}\"", clean_latest);
+        println!(
+            "[kaye] Using latest checkpoint message: \"{}\"",
+            clean_latest
+        );
         clean_latest
     } else {
         let trimmed = raw_msg.trim();
@@ -949,7 +1321,9 @@ fn cmd_push(root_dir: &Path, args: &[String]) {
     match commit_status {
         Ok(s) if s.success() => {
             println!("[kaye] Success! Recorded as 1 clean commit in your local .git repository.");
-            println!("[kaye] Run 'git push' manually when you are ready to upload to GitHub/Remote.");
+            println!(
+                "[kaye] Run 'git push' manually when you are ready to upload to GitHub/Remote."
+            );
         }
         Ok(s) => exit(s.code().unwrap_or(1)),
         Err(e) => {
@@ -967,15 +1341,17 @@ Local Shadow-Git Version Control System for Developers & LLMs
 USAGE:
   kaye <command> [args...]
 
-KAYE CUSTOM COMMANDS:
-  kaye init                      Initialize local sandbox (.kaye/) & update .gitignore
-  kaye save \"<message>\"          Shortcut: runs 'kaye add -A' followed by 'kaye commit -m'
-  kaye list                      Show checkpoints as sequential numbers [1], [2], [3]...
-  kaye restore-num <number>      Reset sandbox to a specific checkpoint number from 'kaye list'
-  kaye restore-msg \"<keyword>\"   Reset sandbox to the latest checkpoint matching message text
-  kaye undo                      Revert to the previous checkpoint ('reset --hard HEAD~1')
-  kaye push \"<message>\" | -    Promote final working state into 1 clean commit in local .git ('-' uses latest checkpoint msg)
-  kaye remove                    Remove the local sandbox (.kaye/) with interactive confirmation
+KAYE CUSTOM COMMANDS (With Safe Shortcuts):
+  kaye init                        Initialize local sandbox (.kaye/) & update .gitignore
+  kaye save, kaye s \"<message>\"    Shortcut: stages all ('add -A') and commits ('commit -m')
+  kaye list, kaye l                Show checkpoints as sequential numbers [1], [2], [3]...
+  kaye what change, kaye w c       Show checkpoint diffs (default: 1, newest at bottom; '+' for newest at top)
+  kaye change message, kaye c m    Change message of a checkpoint by number (e.g. kaye c m 3 \"new message\")
+  kaye restore-num, kaye rn <n>    Reset sandbox to a specific checkpoint number from 'kaye list'
+  kaye restore-msg, kaye rmsg      Reset sandbox to the latest checkpoint matching message text
+  kaye undo, kaye u                Revert to the previous checkpoint ('reset --hard HEAD~1')
+  kaye push, kaye p \"<msg>\" | -    Promote final working state into 1 clean commit in local .git ('-' uses latest checkpoint msg)
+  kaye remove, kaye rm             Remove the local sandbox (.kaye/) with interactive confirmation
 
 STANDARD GIT COMMANDS (100% Isolated Inside .kaye/):
   kaye status                    Show modified files in sandbox
@@ -1031,9 +1407,7 @@ fn main() {
 
     // 3. Block configuring remotes via 'kaye config'
     if subcmd == "config" && args.iter().any(|a| a.contains("remote.")) {
-        eprintln!(
-            "[kaye blocked] Configuring remote repositories is disabled in local sandbox."
-        );
+        eprintln!("[kaye blocked] Configuring remote repositories is disabled in local sandbox.");
         exit(1);
     }
 
@@ -1067,12 +1441,48 @@ fn main() {
         "switch" => cmd_switch(&root_dir, &args[1..]),
         "merge" => cmd_merge(&root_dir, &args[1..]),
         "rebase" => cmd_rebase(&root_dir, &args[1..]),
-        "save" => cmd_save(&root_dir, &args[1..]),
-        "undo" => cmd_undo(&root_dir),
-        "list" => cmd_list(&root_dir),
-        "restore-num" => cmd_restore_num(&root_dir, &args[1..]),
-        "restore-msg" => cmd_restore_msg(&root_dir, &args[1..]),
-        "push" => cmd_push(&root_dir, &args[1..]),
+        "save" | "s" => cmd_save(&root_dir, &args[1..]),
+        "undo" | "u" => cmd_undo(&root_dir),
+        "list" | "l" => cmd_list(&root_dir),
+        "restore-num" | "rn" => cmd_restore_num(&root_dir, &args[1..]),
+        "restore-msg" | "rmsg" => cmd_restore_msg(&root_dir, &args[1..]),
+        "what" | "w" => {
+            if args.len() > 1 && (args[1] == "change" || args[1] == "c") {
+                cmd_what_change(&root_dir, &args[2..]);
+            } else {
+                eprintln!(
+                    "[kaye error] Unknown subcommand for '{}'. Did you mean 'kaye what change' (or 'kaye w c')?",
+                    subcmd
+                );
+                eprintln!("Usage: kaye what change [N|all] [+]  (shortcut: kaye w c)");
+                exit(1);
+            }
+        }
+        "what-change" | "whatchange" | "wc" => cmd_what_change(&root_dir, &args[1..]),
+        "change" => {
+            if args.len() > 1 && (args[1] == "message" || args[1] == "msg" || args[1] == "m") {
+                cmd_change_message(&root_dir, &args[2..]);
+            } else {
+                eprintln!(
+                    "[kaye error] Unknown subcommand for 'change'. Did you mean 'kaye change message <number> \"<msg>\"'?"
+                );
+                eprintln!("Usage: kaye change message <number> \"<new message>\" (shortcut: kaye c m <number> \"<msg>\")");
+                exit(1);
+            }
+        }
+        "c" => {
+            if args.len() > 1 && (args[1] == "message" || args[1] == "msg" || args[1] == "m") {
+                cmd_change_message(&root_dir, &args[2..]);
+            } else {
+                eprintln!(
+                    "[kaye error] Unknown subcommand for 'c'. Did you mean 'kaye c m <number> \"<msg>\"'?"
+                );
+                eprintln!("Usage: kaye c m <number> \"<new message>\"");
+                exit(1);
+            }
+        }
+        "cm" => cmd_change_message(&root_dir, &args[1..]),
+        "push" | "p" => cmd_push(&root_dir, &args[1..]),
         // Only trigger sandbox removal for `kaye remove` or bare `kaye rm` (without file args).
         // That way `kaye rm --cached <file>` or `kaye rm <file>` safely passes through to git.
         "remove" => cmd_remove(&root_dir),
