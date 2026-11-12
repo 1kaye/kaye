@@ -1,0 +1,13 @@
+[package]
+name = "kaye"
+version = "1.0.0"
+edition = "2021"
+description = "KAYE — Keep All Your Experiments. Local Shadow-Git Version Control System for developers and LLMs."
+authors = ["1kaye"]
+license = "MIT"
+
+[[bin]]
+name = "kaye"
+path = "src/main.rs"
+
+[dependencies]
