@@ -48,6 +48,22 @@ fn append_unique_line(file_path: &Path, entry: &str) -> std::io::Result<bool> {
     Ok(false)
 }
 
+/// Syncs ignore patterns from `.gitignore` into `.kaye/info/exclude` without modifying `.gitignore`
+fn sync_gitignore_to_kaye_exclude(root_dir: &Path) {
+    let gitignore_path = root_dir.join(".gitignore");
+    let Ok(content) = fs::read_to_string(&gitignore_path) else {
+        return;
+    };
+    let exclude_path = root_dir.join(KAYE_DIR).join("info").join("exclude");
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() || trimmed.starts_with('#') {
+            continue;
+        }
+        let _ = append_unique_line(&exclude_path, trimmed);
+    }
+}
+
 const GIT_SUBCMDS: &[&str] = &[
     // Core & Status
     "add",
@@ -397,10 +413,11 @@ fn cmd_init(current_dir: &Path) {
         exit(code);
     }
 
-    // 1. Ensure .kaye ignores both itself and the primary .git directory
+    // 1. Ensure .kaye ignores both itself, the primary .git directory, and existing .gitignore patterns
     let exclude_path = kaye_path.join("info").join("exclude");
     let _ = append_unique_line(&exclude_path, ".kaye/");
     let _ = append_unique_line(&exclude_path, ".git/");
+    sync_gitignore_to_kaye_exclude(current_dir);
 
     // 2. Ensure the primary .git repository ignores .kaye/ via .gitignore
     let gitignore_path = current_dir.join(".gitignore");
@@ -471,6 +488,8 @@ fn cmd_save(root_dir: &Path, args: &[String]) {
         eprintln!("Example: kaye save \"baseline before starting task\"");
         exit(1);
     }
+
+    sync_gitignore_to_kaye_exclude(root_dir);
 
     let add_code = run_kaye_git(root_dir, &["add", "-A"], true);
     if add_code != 0 {
@@ -544,6 +563,7 @@ fn cmd_add(root_dir: &Path, args: &[String]) {
         println!("hint: Maybe you wanted to say 'kaye add .'?\nhint: Or use 'kaye save \"<message>\"' to stage and commit all changes.");
         return;
     }
+    sync_gitignore_to_kaye_exclude(root_dir);
     let mut git_args = vec!["add"];
     for a in args {
         git_args.push(a.as_str());
@@ -1333,6 +1353,32 @@ fn cmd_push(root_dir: &Path, args: &[String]) {
     }
 }
 
+/// Handles `kaye .gitignore` -> syncs and displays patterns from `.gitignore` for `.kaye`
+fn cmd_gitignore(root_dir: &Path) {
+    sync_gitignore_to_kaye_exclude(root_dir);
+    let gitignore_path = root_dir.join(".gitignore");
+    let Ok(content) = fs::read_to_string(&gitignore_path) else {
+        println!("[kaye] No .gitignore file found at {}.", root_dir.display());
+        return;
+    };
+
+    let entries: Vec<&str> = content
+        .lines()
+        .map(|l| l.trim())
+        .filter(|l| !l.is_empty() && !l.starts_with('#'))
+        .collect();
+
+    println!("=== KAYE .GITIGNORE PATTERNS ===");
+    if entries.is_empty() {
+        println!("  (none)");
+    } else {
+        for entry in entries {
+            println!("  - {}", entry);
+        }
+    }
+    println!("================================");
+}
+
 fn print_help() {
     println!(
         "KAYE — Keep All Your Experiments (kaye) v1.0.0
@@ -1351,6 +1397,7 @@ KAYE CUSTOM COMMANDS (With Safe Shortcuts):
   kaye restore-msg, kaye rmsg      Reset sandbox to the latest checkpoint matching message text
   kaye undo, kaye u                Revert to the previous checkpoint ('reset --hard HEAD~1')
   kaye push, kaye p \"<msg>\" | -    Promote final working state into 1 clean commit in local .git ('-' uses latest checkpoint msg)
+  kaye .gitignore                  Show .gitignore patterns synced for .kaye sandbox
   kaye remove, kaye rm             Remove the local sandbox (.kaye/) with interactive confirmation
 
 STANDARD GIT COMMANDS (100% Isolated Inside .kaye/):
@@ -1482,6 +1529,7 @@ fn main() {
             }
         }
         "cm" => cmd_change_message(&root_dir, &args[1..]),
+        ".gitignore" => cmd_gitignore(&root_dir),
         "push" | "p" => cmd_push(&root_dir, &args[1..]),
         // Only trigger sandbox removal for `kaye remove` or bare `kaye rm` (without file args).
         // That way `kaye rm --cached <file>` or `kaye rm <file>` safely passes through to git.

@@ -80,6 +80,7 @@ Or re-run `./install.sh` (Linux/macOS) or `.\install.ps1` (Windows) to overwrite
 | `kaye restore-msg "<keyword>"` | `kaye rmsg "<keyword>"` | Searches commit messages (case-insensitive) and hard-resets the working tree to the latest checkpoint matching `<keyword>`. |
 | `kaye undo` | `kaye u` | Reverts the working tree back by 1 checkpoint (`reset --hard HEAD~1`). |
 | `kaye push "<message>"` / `kaye push -` | `kaye p "<msg>"` / `kaye p -` | Promotes the current working tree state into 1 clean commit on the active branch of the primary `.git` repository. Using `-` automatically reuses the latest checkpoint message from `.kaye/`. |
+| `kaye .gitignore` | — | Lists `.gitignore` patterns that are automatically synced and ignored inside `.kaye/` on `init`, `add`, and `save`. |
 | `kaye remove` | `kaye rm` | Removes the `.kaye/` sandbox directory and all checkpoints with interactive `[y/N]` confirmation. |
 
 ### Standard Git Commands (Isolated Inside `.kaye/`)
