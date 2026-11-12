@@ -103,7 +103,11 @@ kaye restore-msg "<keyword>"
 Only when the implementation is complete, builds/tests pass, and the user asks to finalize or commit the changes to the main repository:
 
 ~~~bash
+# Option A: Specify a custom commit message
 kaye push "<clean commit message for main git>"
+
+# Option B: Reuse the latest checkpoint message from .kaye
+kaye push -
 ~~~
 
-`kaye push` synchronizes the final state and records a single clean commit on the currently active branch in the primary `.git` repository.
+`kaye push` synchronizes the final state and records a single clean commit on the currently active branch in the primary `.git` repository. Passing `-` automatically extracts and reuses the commit message from the latest checkpoint (`HEAD`) in `.kaye/`.

@@ -77,7 +77,7 @@ Or re-run `./install.sh` (Linux/macOS) or `.\install.ps1` (Windows) to overwrite
 | `kaye restore-num <number>` | Hard-resets the working tree to the checkpoint matching `<number>` from `kaye list`. |
 | `kaye restore-msg "<keyword>"` | Searches commit messages (case-insensitive) and hard-resets the working tree to the latest checkpoint matching `<keyword>`. |
 | `kaye undo` | Reverts the working tree back by 1 checkpoint (`reset --hard HEAD~1`). |
-| `kaye push "<message>"` | Promotes the current working tree state into 1 clean commit on the active branch of the primary `.git` repository. |
+| `kaye push "<message>"` / `kaye push -` | Promotes the current working tree state into 1 clean commit on the active branch of the primary `.git` repository. Using `-` automatically reuses the latest checkpoint message from `.kaye/`. |
 | `kaye remove` / `kaye rm` | Removes the `.kaye/` sandbox directory and all checkpoints with interactive `[y/N]` confirmation. |
 
 ### Standard Git Commands (Isolated Inside `.kaye/`)
@@ -132,7 +132,11 @@ kaye restore-num 2
 kaye restore-msg "baseline"
 
 # 7. Once verified, promote the final state into 1 clean commit in main .git
+# Option A: Specify a custom commit message
 kaye push "feat(auth): implement token validation"
+
+# Option B: Reuse the latest checkpoint message from .kaye
+kaye push -
 
 # 8. Push your clean main .git history to your remote server when ready
 git push
