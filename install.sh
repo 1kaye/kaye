@@ -11,6 +11,13 @@ chmod +x "$INSTALL_DIR/kaye"
 
 echo "[kaye installer] Installed 'kaye' to $INSTALL_DIR/kaye"
 
+# Sinkronkan ~/.cargo/bin/kaye via symlink agar tidak tertimpa binary lama di PATH
+CARGO_BIN_DIR="$HOME/.cargo/bin"
+if [ -d "$CARGO_BIN_DIR" ]; then
+    ln -sf "$INSTALL_DIR/kaye" "$CARGO_BIN_DIR/kaye"
+    echo "[kaye installer] Symlinked '$CARGO_BIN_DIR/kaye' -> '$INSTALL_DIR/kaye'"
+fi
+
 if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
     echo ""
     echo "[note] $INSTALL_DIR is not in your PATH."
