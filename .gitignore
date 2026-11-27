@@ -6,3 +6,7 @@ core/target/
 *.bak.*
 *.tmp
 .DS_Store
+
+# Archiso build outputs
+iso/out/
+iso/work/

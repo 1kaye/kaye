@@ -1,7 +1,9 @@
 # Kaye OS — Official Arch Repository Packages
-# Base & Recovery
+# Base, Networking & Recovery
 base-devel
 git
+gum
+networkmanager
 pacman-contrib
 snapper
 zram-generator
@@ -9,9 +11,13 @@ reflector
 ufw
 plymouth
 
-# Wayland, Hyprland, UWSM & Portals
+# Login Manager, Wayland, Hyprland, UWSM & Portals
+greetd
+greetd-tuigreet
 hyprland
+lua
 uwsm
+xdg-utils
 xdg-desktop-portal-hyprland
 xdg-desktop-portal-gtk
 polkit-gnome
@@ -37,6 +43,7 @@ qt6-multimedia-ffmpeg
 qt6-imageformats
 
 # Hardware Utilities
+pciutils
 bluez
 bluez-utils
 power-profiles-daemon

@@ -1,0 +1,3 @@
+-- Personal startup applications (loaded after $KAYE_PATH/default/hypr/autostart.lua)
+-- Example:
+-- kaye.launch_on_start("firefox")

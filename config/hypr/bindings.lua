@@ -1,0 +1,11 @@
+-- Personal keybinding overrides (loaded after $KAYE_PATH/default/hypr/bindings.lua)
+-- View active bindings with `Super + K` or `kaye menu keybindings`.
+--
+-- Add a new binding:
+-- kaye.bind("SUPER + C", "Open Editor", kaye.launch("foot -e nvim"))
+--
+-- Replace a default binding:
+-- kaye.rebind("SUPER + E", "Open File Manager", kaye.launch("foot -e yazi"))
+--
+-- Disable a default binding:
+-- hl.unbind("SUPER + B")

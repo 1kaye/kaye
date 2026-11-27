@@ -10,18 +10,49 @@
 ███   ███  ███   ███     ███     █████████
 ```
 
-A minimal, modular **Arch Linux** desktop environment built on **Hyprland**, **Quickshell**, and a single **Rust** core binary (`kaye`). Designed for speed, clean customization, and zero bloat.
+A minimal, zero-config **Arch Linux** desktop environment built on **Hyprland** (Lua 0.57+), **Quickshell**, and a single **Rust** core binary (`kaye`). Designed for speed, clean customization, and zero bloat.
 
 ## Highlights
 
-- **Single-Process Desktop UI (`Quickshell`)** — One lightweight Wayland shell process handles the bar (with hover tooltips on every widget), `Super + Space` hierarchical menu, app launcher, keybindings viewer, notifications, volume/brightness OSD, wallpaper, login intro, and lock screen.
-- **Single Rust Core Binary (`kaye`)** — Unified CLI, atomic `colors.toml` theme engine, JSONC menu tree + `.desktop` scanner + fuzzy search backend, shell config & toggle manager, and Snapper/update wrappers.
+- **Turnkey Zero-Config Install** — Go from a blank disk on the official Arch Live ISO (or a custom Kaye OS Live ISO) to a fully configured desktop in one command, or bootstrap an existing Arch Linux system with a single one-liner.
+- **Single-Process Desktop UI (`Quickshell`)** — One lightweight Wayland shell process (`kaye-shell.service`) handles the bar (with hover tooltips on every widget), `Super + Space` hierarchical menu, app launcher, keybindings viewer, notifications, volume/brightness OSD, wallpaper, login intro, and lock screen.
+- **Single Rust Core Binary (`kaye`)** — Unified CLI, atomic `colors.toml` theme engine, JSONC menu tree + `.desktop` scanner + fuzzy search backend, Lua keybindings reader, shell config & toggle manager, and Snapper/update wrappers.
 - **Unified `KAYE` Branding** — Custom Plymouth boot splash (with LUKS passphrase dialog and eased progress bar), Quickshell login intro cover, lock screen, and `kaye about` / `fastfetch` art.
 - **3-Layer Configuration** — Repository defaults (`default/`), user overrides (`~/.config/`), and runtime state (`~/.local/state/kaye/`) stay cleanly separated.
 
 ## Installation
 
-On an existing **Arch Linux** installation (`git` and `base-devel` recommended):
+### Option 1: Fresh Disk / Arch Live ISO (Zero Manual Arch Setup)
+
+Boot the official **Arch Linux Live ISO** (UEFI), connect to the internet (Ethernet works automatically, or let the installer's built-in `iwctl` Wi-Fi wizard guide you), and run:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/1kaye/kaye/main/arch-install.sh | bash
+```
+
+The interactive `gum` wizard configures keyboard layout, target disk partitioning (1 GiB FAT32 ESP + Btrfs subvolumes `@`, `@home`, `@log`, `@pkg`, `@.snapshots` with `zstd` compression), optional **LUKS2** disk encryption, bootloader (**Limine** default or **systemd-boot**), timezone, user account, theme, and browser — then installs Arch Linux and runs the full Kaye OS setup automatically in chroot. Reboot when prompted to boot straight into Kaye OS.
+
+> **Unattended / dry-run installs:** `arch-install.sh` also supports `--config kaye.env --unattended` (or auto-detecting a drive with `LABEL=cidata` containing `kaye.env`/`kaye.conf`) and `--dry-run`. Run `./arch-install.sh --help` for all options.
+
+#### Build a Custom Bootable Kaye OS ISO
+
+To generate a turnkey Live ISO with Kaye OS bundled under `/opt/kaye` (auto-launching the installer on `tty1`):
+
+```bash
+sudo pacman -S --needed archiso
+sudo ./iso/build.sh
+# Outputs: iso/out/kaye-os-<YYYY.MM.DD>-x86_64.iso
+```
+
+### Option 2: Existing Arch Linux
+
+On an existing **Arch Linux** installation, run as your regular user with `sudo` privileges:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/1kaye/kaye/main/boot.sh | bash
+```
+
+Or clone and run locally:
 
 ```bash
 git clone https://github.com/1kaye/kaye.git ~/kaye
@@ -29,37 +60,41 @@ cd ~/kaye
 bash install/all.sh
 ```
 
-`install/all.sh` runs six idempotent steps:
+`install/all.sh` presents an interactive `gum` wizard (theme, default browser, and login mode) and runs 8 idempotent, chroot-safe steps:
 
-1. `01-packages.sh` — Installs base packages ([install/packages.base](./install/packages.base)), `yay-bin`, AUR packages ([install/packages.aur](./install/packages.aur)), and configures `rustup default stable`.
-2. `02-services.sh` — Enables `NetworkManager`, `bluetooth`, `power-profiles-daemon`, `ufw`, `zram-generator`, and Snapper (retention limit: 3).
-3. `03-hardware.sh` — Auto-detects CPU microcode and GPU drivers (`amd`/`intel`/`nvidia`).
-4. `04-plymouth.sh` — Installs the `kaye` Plymouth theme, adds the `plymouth` mkinitcpio hook, and rebuilds initramfs.
-5. `05-core-and-dotfiles.sh` — Builds and installs `kaye` into `~/.local/bin/kaye`, copies starter configs into `~/.config/` (without overwriting existing files), and enables `kaye-shell.service`.
-6. `06-theme.sh` — Applies the default `catppuccin` theme and wallpaper.
+1. `01-packages.sh` — Tunes `/etc/pacman.conf`, installs official packages ([install/packages.base](./install/packages.base)) and selected browser (`firefox` / `chromium` / `skip`), builds `yay-bin`, installs AUR packages ([install/packages.aur](./install/packages.aur)), and configures `rustup default stable`.
+2. `02-services.sh` — Enables `NetworkManager`, `bluetooth`, `power-profiles-daemon`, `paccache.timer`, masks `NetworkManager-wait-online.service`, configures UFW (default deny incoming), ZRAM (`zram-generator`), Btrfs Snapper (max 3 snapshots, no timeline spam), and PAM `faillock`.
+3. `03-hardware.sh` — Auto-detects CPU microcode (`amd-ucode` / `intel-ucode`), GPU drivers (`amd` / `intel` / `nvidia`), and additive early KMS (`mkinitcpio` drop-in).
+4. `04-boot-and-plymouth.sh` — Installs the `kaye` Plymouth theme, adds the `plymouth` hook to `/etc/mkinitcpio.conf`, automatically patches `quiet splash loglevel=3` (with timestamped backups) for **Limine**, **systemd-boot**, or **GRUB**, and rebuilds initramfs.
+5. `05-login.sh` — Configures `greetd` + `tuigreet` launching Hyprland via **UWSM** (`uwsm start -e -D Hyprland hyprland.desktop`), with LUKS-aware autologin (`[initial_session]` + passwordless default GNOME keyring when root is LUKS-encrypted).
+6. `06-core-and-dotfiles.sh` — Builds and installs `kaye` into `~/.local/bin/kaye`, installs login shell defaults, copies Lua Hyprland and app starter configs into `~/.config/` (safely replacing autogenerated `hyprland.lua` while preserving user edits), and enables `kaye-shell.service`.
+7. `07-desktop-defaults.sh` — Installs GTK3/GTK4 dark theme (`adw-gtk3-dark`), Qt6 dark theme (`qt6ct`), `hyprland-portals.conf`, browser-aware `mimeapps.list`, and the one-shot graphical first-run hook ([install/first-run.sh](./install/first-run.sh) → `~/.local/bin/kaye-first-run`).
+8. `08-theme.sh` — Applies the selected theme (default: `catppuccin`) and renders all templates including `~/.local/state/kaye/current/theme/hyprland.lua`.
 
-### Post-Install Notes
+### Pre-Configured Out of the Box
 
-- **Plymouth boot splash:** Ensure `quiet splash` is present in your bootloader kernel parameters.
-- **Auto-start Hyprland with UWSM** (optional, no display manager required) — add to `~/.bash_profile`:
-  ```bash
-  if uwsm check may-start; then
-    exec uwsm start hyprland-uwsm.desktop
-  fi
-  ```
+No manual bootloader edits or `~/.bash_profile` wiring are needed after installation:
+
+- **Storage & Hygiene:** Btrfs + Snapper (limit 3), ZRAM swap, UFW firewall, `paccache.timer`.
+- **Hardware & Boot:** CPU microcode, AMD/Intel/NVIDIA drivers, early KMS, `KAYE` Plymouth splash with automatic `quiet splash loglevel=3` for Limine / systemd-boot / GRUB.
+- **Session & Login:** `greetd` + `tuigreet` → UWSM Hyprland session, with automatic LUKS-aware autologin.
+- **Desktop Polish:** GTK3/GTK4 & Qt6 dark themes, XDG portals, default browser & MIME associations, `kaye` Rust CLI, Quickshell desktop, bundled `catppuccin` theme, and first-boot `gsettings`/PipeWire/welcome toast setup.
 
 ## Repository Structure
 
 ```text
 kaye/
-├── branding/        # KAYE ASCII logo and SVG assets
-├── config/          # Starter configs copied to ~/.config/ on first install
-├── core/            # Rust CLI, theme engine, menu/search backend (`kaye`)
-├── default/         # Repo-managed Hyprland, menu, and `.tpl` color templates
-├── install/         # Idempotent Arch bootstrap scripts and package lists
-├── plymouth/kaye/   # Plymouth boot splash theme & LUKS prompt assets
-├── shell/           # Quickshell thin QML desktop modules
-└── themes/          # Bundled themes (`catppuccin`, `tokyo-night`, `gruvbox`)
+├── arch-install.sh     # Turnkey UEFI Arch Live-ISO installer (disk, LUKS2, Btrfs, bootloader, chroot)
+├── boot.sh             # One-liner existing-Arch bootstrapper (clones repo -> install/all.sh)
+├── branding/           # KAYE ASCII logo and SVG assets
+├── config/             # Starter configs copied to ~/.config/ (hypr/*.lua, gtk, qt6ct, portals, mime, etc.)
+├── core/               # Rust CLI, theme engine, menu/search & Lua keybindings backend (`kaye`)
+├── default/            # Repo-managed Hyprland Lua modules, menu.jsonc, and `.tpl` color templates
+├── install/            # Idempotent chroot-safe installers (all.sh, 01..08, first-run.sh, lib/, packages.*)
+├── iso/                # Bootable Archiso builder (`build.sh`, `packages.x86_64`, `overlay/`)
+├── plymouth/kaye/      # Plymouth boot splash theme & LUKS prompt assets
+├── shell/              # Quickshell thin QML desktop modules
+└── themes/             # Bundled themes (`catppuccin`, `tokyo-night`, `gruvbox`)
 ```
 
 ## Default Keybindings
@@ -73,12 +108,14 @@ kaye/
 | `Super + E` | File Manager (`thunar`) |
 | `Super + B` | Default Browser |
 | `Super + Q` / `F` / `V` / `J` | Close / Fullscreen / Float / Toggle split |
+| `Super + Arrows` | Move window focus (`Left` / `Right` / `Up` / `Down`) |
 | `Super + 1..9` | Switch workspace (`+ Shift` to move window) |
 | `Super + Shift + B` | Show / hide bar |
 | `Super + Ctrl + I` | Toggle Stay Awake |
 | `Super + Ctrl + N` | Toggle Night Light (`hyprsunset`) |
 | `Super + Shift + S` / `Print` | Region / fullscreen screenshot to clipboard |
 | `Super + L` | Lock Screen |
+| `XF86Audio*` / `XF86MonBrightness*` | Volume / mute / brightness with Quickshell OSD |
 
 ## CLI Reference (`kaye`)
 
@@ -92,7 +129,7 @@ kaye/
 | `kaye menu query [route] [--search Q] [--json]` | Query `menu.jsonc` hierarchy |
 | `kaye menu apps [--search Q] [--json]` | Scan and fuzzy-search desktop applications |
 | `kaye menu provider <name> [--search Q] [--json]` | Query dynamic providers (`themes`, `backgrounds`, `snapshots`) |
-| `kaye menu keybindings [--json]` | Parse active Hyprland `bindd` shortcuts |
+| `kaye menu keybindings [--json]` | List active Hyprland Lua keybindings (`kaye.bind` / `kaye.rebind`) |
 | `kaye bar position <top\|bottom\|left\|right>` | Move Quickshell bar edge |
 | `kaye bar background <opaque\|glassy\|none>` | Change bar background style |
 | `kaye bar toggle` | Show / hide bar |
@@ -104,9 +141,16 @@ kaye/
 ## Themes & Customization
 
 - **Bundled themes:** `catppuccin`, `tokyo-night`, `gruvbox`.
-- **Custom themes:** Create `~/.config/kaye/themes/<name>/colors.toml` (with optional `backgrounds/` directory) and apply it with `kaye theme set <name>`.
+- **Custom themes:** Create `~/.config/kaye/themes/<name>/colors.toml` (with optional `backgrounds/` directory) and apply it with `kaye theme set <name>`. Templates in `default/themed/` (including `default/themed/hyprland.lua.tpl`) render atomically into `~/.local/state/kaye/current/theme/`.
 - **Menu & Shell overrides:** Edit `~/.config/kaye/menu.jsonc` (merged on top of `default/kaye/menu.jsonc`) and `~/.config/kaye/shell.json` (hot-reloaded by Quickshell).
-- **Hyprland overrides:** Edit files in `~/.config/hypr/` (`monitors.conf`, `input.conf`, `bindings.conf`, `looknfeel.conf`, `autostart.conf`), which are sourced after `default/hypr/`.
+- **Hyprland Lua overrides (Hyprland 0.57+):** Edit files in `~/.config/hypr/` (`monitors.lua`, `input.lua`, `bindings.lua`, `looknfeel.lua`, `autostart.lua`), which are loaded after `default/hypr/*.lua` by `~/.config/hypr/hyprland.lua`.
+  ```lua
+  -- ~/.config/hypr/bindings.lua
+  kaye.bind("SUPER + C", "Open Editor", kaye.launch("foot -e nvim"))
+  kaye.rebind("SUPER + E", "Open Yazi", kaye.launch("foot -e yazi"))
+  hl.unbind("SUPER + B")
+  ```
+  Validate edits with `Hyprland --verify-config` or `hyprctl reload && hyprctl configerrors`.
 
 ## Development
 
@@ -117,4 +161,4 @@ cargo clippy --all-targets -- -D warnings
 cargo test
 ```
 
-See [AGENTS.md](./AGENTS.md) for architecture conventions, QML rules, and verification steps.
+See [AGENTS.md](./AGENTS.md) for architecture conventions, Hyprland Lua rules, QML rules, installer contracts, and verification steps.

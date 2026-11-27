@@ -2,8 +2,10 @@ use crate::{config, system, theme};
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
+use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct RawMenuEntry {
@@ -494,45 +496,582 @@ pub fn scan_desktop_apps(search: Option<&str>) -> Result<Vec<MenuRow>> {
     Ok(scored.into_iter().map(|(_, r)| r).collect())
 }
 
-pub fn list_keybindings() -> Result<Vec<KeybindingRow>> {
-    let mut files = Vec::new();
-    let default_bindings = config::kaye_root()?.join("default/hypr/bindings.conf");
-    if default_bindings.is_file() {
-        files.push(default_bindings);
+const LUA_KEYBIND_SCANNER: &str = r##"
+local kaye_root = os.getenv("_KAYE_SCAN_ROOT") or ""
+local user_bindings = os.getenv("_KAYE_SCAN_USER") or ""
+
+local rows = {}
+
+local function clean(value)
+  return tostring(value or ""):gsub("[\t\r\n]+", " "):gsub("^%s+", ""):gsub("%s+$", "")
+end
+
+local function norm_keys(value)
+  return clean(value):gsub("%s+", " "):upper()
+end
+
+local function format_value(value)
+  local t = type(value)
+  if t == "string" or t == "number" or t == "boolean" then
+    return tostring(value)
+  elseif t == "table" then
+    local keys = {}
+    for k in pairs(value) do
+      table.insert(keys, k)
+    end
+    table.sort(keys, function(a, b) return tostring(a) < tostring(b) end)
+    local parts = {}
+    for _, k in ipairs(keys) do
+      if type(k) == "number" then
+        table.insert(parts, format_value(value[k]))
+      else
+        table.insert(parts, tostring(k) .. "=" .. format_value(value[k]))
+      end
+    end
+    return table.concat(parts, ", ")
+  end
+  return ""
+end
+
+local function dsp_proxy(path)
+  return setmetatable({ _path = path }, {
+    __index = function(self, key)
+      return dsp_proxy(self._path .. "." .. tostring(key))
+    end,
+    __call = function(self, ...)
+      if self._path == "hl.dsp.exec_cmd" or self._path == "hl.dsp.exec_raw" then
+        local first = ...
+        return { __kaye_dsp = clean(first) }
+      end
+      local args = {}
+      for i = 1, select("#", ...) do
+        local formatted = format_value(select(i, ...))
+        if formatted ~= "" then
+          table.insert(args, formatted)
+        end
+      end
+      local short = self._path:gsub("^hl%.dsp%.", "")
+      return { __kaye_dsp = short .. "(" .. table.concat(args, ", ") .. ")" }
+    end,
+  })
+end
+
+local noop
+noop = setmetatable({}, {
+  __index = function() return noop end,
+  __call = function() return noop end,
+  __tostring = function() return "" end,
+})
+
+hl = setmetatable({
+  dsp = dsp_proxy("hl.dsp"),
+  unbind = function(keys)
+    local target = norm_keys(keys)
+    for i = #rows, 1, -1 do
+      if norm_keys(rows[i].keys) == target then
+        table.remove(rows, i)
+      end
+    end
+  end,
+  bind = function(keys, dispatcher, opts)
+    opts = opts or {}
+    local cmd = ""
+    if type(dispatcher) == "table" and dispatcher.__kaye_dsp then
+      cmd = clean(dispatcher.__kaye_dsp)
+    elseif type(dispatcher) == "string" then
+      cmd = clean(dispatcher)
+    elseif type(dispatcher) == "function" then
+      cmd = "lua()"
+    end
+    local desc = clean(opts.description or opts.desc or "")
+    if desc == "" then
+      desc = cmd
+    end
+    table.insert(rows, {
+      keys = clean(keys),
+      description = desc,
+      command = cmd,
+    })
+    return noop
+  end,
+  get_config = function() return nil end,
+}, {
+  __index = function() return noop end,
+})
+
+debug.sethook(function()
+  error("instruction limit exceeded")
+end, "", 2000000)
+
+local bootstrap_file = kaye_root .. "/default/hypr/bootstrap.lua"
+local bf = io.open(bootstrap_file, "r")
+if bf then
+  bf:close()
+  local ok, init = pcall(dofile, bootstrap_file)
+  if ok and type(init) == "function" then
+    pcall(init, kaye_root)
+  end
+end
+
+pcall(require, "default.hypr.helpers")
+
+local default_file = kaye_root .. "/default/hypr/bindings.lua"
+local df = io.open(default_file, "r")
+if df then
+  df:close()
+  pcall(dofile, default_file)
+end
+
+if user_bindings and user_bindings ~= "" then
+  local uf = io.open(user_bindings, "r")
+  if uf then
+    uf:close()
+    pcall(dofile, user_bindings)
+  end
+end
+
+debug.sethook()
+
+for _, row in ipairs(rows) do
+  print(row.keys .. "\t" .. row.description .. "\t" .. row.command)
+end
+"##;
+
+fn hypr_config_dir() -> Result<PathBuf> {
+    if let Ok(xdg) = env::var("XDG_CONFIG_HOME") {
+        if !xdg.trim().is_empty() {
+            return Ok(PathBuf::from(xdg).join("hypr"));
+        }
     }
-    let user_bindings = config::home_dir()?.join(".config/hypr/bindings.conf");
-    if user_bindings.is_file() {
-        files.push(user_bindings);
+    Ok(config::home_dir()?.join(".config/hypr"))
+}
+
+fn normalize_key_chord(keys: &str) -> String {
+    keys.split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_ascii_uppercase()
+}
+
+fn eval_lua_keybindings(
+    kaye_root: &Path,
+    user_bindings: Option<&Path>,
+) -> Option<Vec<KeybindingRow>> {
+    let mut cmd = Command::new("lua");
+    cmd.args(["-E", "-e", LUA_KEYBIND_SCANNER])
+        .env("_KAYE_SCAN_ROOT", kaye_root)
+        .env(
+            "_KAYE_SCAN_USER",
+            user_bindings.unwrap_or_else(|| Path::new("")),
+        );
+
+    let output = cmd.output().ok()?;
+    if !output.status.success() {
+        return None;
     }
 
+    let stdout = String::from_utf8_lossy(&output.stdout);
     let mut rows = Vec::new();
-    for file in files {
-        let raw = fs::read_to_string(&file)?;
-        for line in raw.lines() {
-            let trimmed = line.trim();
-            if !(trimmed.starts_with("bindd") || trimmed.starts_with("bind "))
-                && !trimmed.starts_with("bind=")
-                && !trimmed.starts_with("bindd=")
-            {
+    for line in stdout.lines() {
+        let mut parts = line.splitn(3, '\t');
+        let Some(keys) = parts.next() else {
+            continue;
+        };
+        let Some(description) = parts.next() else {
+            continue;
+        };
+        let command = parts.next().unwrap_or("");
+        if !keys.trim().is_empty() {
+            rows.push(KeybindingRow {
+                keys: keys.trim().to_string(),
+                description: description.trim().to_string(),
+                command: command.trim().to_string(),
+            });
+        }
+    }
+    Some(rows)
+}
+
+fn strip_lua_comments(raw: &str) -> String {
+    let chars: Vec<char> = raw.chars().collect();
+    let mut out = String::with_capacity(raw.len());
+    let mut i = 0;
+    while i < chars.len() {
+        let c = chars[i];
+        if c == '"' || c == '\'' {
+            let quote = c;
+            out.push(c);
+            i += 1;
+            while i < chars.len() {
+                let ch = chars[i];
+                out.push(ch);
+                i += 1;
+                if ch == '\\' && i < chars.len() {
+                    out.push(chars[i]);
+                    i += 1;
+                } else if ch == quote {
+                    break;
+                }
+            }
+            continue;
+        }
+        if c == '[' && i + 1 < chars.len() && chars[i + 1] == '[' {
+            out.push('[');
+            out.push('[');
+            i += 2;
+            while i < chars.len() {
+                if chars[i] == ']' && i + 1 < chars.len() && chars[i + 1] == ']' {
+                    out.push(']');
+                    out.push(']');
+                    i += 2;
+                    break;
+                }
+                out.push(chars[i]);
+                i += 1;
+            }
+            continue;
+        }
+        if c == '-' && i + 1 < chars.len() && chars[i + 1] == '-' {
+            i += 2;
+            while i < chars.len() && chars[i] != '\n' {
+                i += 1;
+            }
+            continue;
+        }
+        out.push(c);
+        i += 1;
+    }
+    out
+}
+
+fn unquote_lua_string(expr: &str) -> Option<String> {
+    let s = expr.trim();
+    if s.starts_with("[[") && s.ends_with("]]") && s.len() >= 4 {
+        return Some(s[2..s.len() - 2].to_string());
+    }
+    let quote = s.chars().next()?;
+    if (quote == '"' || quote == '\'') && s.len() >= 2 && s.ends_with(quote) {
+        let inner = &s[1..s.len() - 1];
+        let mut out = String::with_capacity(inner.len());
+        let mut chars = inner.chars();
+        while let Some(c) = chars.next() {
+            if c == '\\' {
+                if let Some(next) = chars.next() {
+                    out.push(next);
+                }
+            } else {
+                out.push(c);
+            }
+        }
+        return Some(out);
+    }
+    None
+}
+
+fn split_lua_args(arg_str: &str) -> Vec<String> {
+    let chars: Vec<char> = arg_str.chars().collect();
+    let mut args = Vec::new();
+    let mut current = String::new();
+    let mut paren = 0usize;
+    let mut brace = 0usize;
+    let mut bracket = 0usize;
+    let mut i = 0;
+
+    while i < chars.len() {
+        let c = chars[i];
+        if c == '"' || c == '\'' {
+            let quote = c;
+            current.push(c);
+            i += 1;
+            while i < chars.len() {
+                let ch = chars[i];
+                current.push(ch);
+                i += 1;
+                if ch == '\\' && i < chars.len() {
+                    current.push(chars[i]);
+                    i += 1;
+                } else if ch == quote {
+                    break;
+                }
+            }
+            continue;
+        }
+        if c == '[' && i + 1 < chars.len() && chars[i + 1] == '[' {
+            current.push('[');
+            current.push('[');
+            i += 2;
+            while i < chars.len() {
+                if chars[i] == ']' && i + 1 < chars.len() && chars[i + 1] == ']' {
+                    current.push(']');
+                    current.push(']');
+                    i += 2;
+                    break;
+                }
+                current.push(chars[i]);
+                i += 1;
+            }
+            continue;
+        }
+
+        match c {
+            '(' => {
+                paren += 1;
+                current.push(c);
+            }
+            ')' => {
+                paren = paren.saturating_sub(1);
+                current.push(c);
+            }
+            '{' => {
+                brace += 1;
+                current.push(c);
+            }
+            '}' => {
+                brace = brace.saturating_sub(1);
+                current.push(c);
+            }
+            '[' => {
+                bracket += 1;
+                current.push(c);
+            }
+            ']' => {
+                bracket = bracket.saturating_sub(1);
+                current.push(c);
+            }
+            ',' if paren == 0 && brace == 0 && bracket == 0 => {
+                args.push(current.trim().to_string());
+                current.clear();
+            }
+            _ => current.push(c),
+        }
+        i += 1;
+    }
+
+    let tail = current.trim();
+    if !tail.is_empty() {
+        args.push(tail.to_string());
+    }
+    args
+}
+
+fn extract_lua_opt_description(opts: &str) -> Option<String> {
+    for key in ["description", "desc"] {
+        if let Some(pos) = opts.find(key) {
+            let rest = &opts[pos + key.len()..];
+            let rest = rest.trim_start();
+            if let Some(after_eq) = rest.strip_prefix('=') {
+                let val_part = after_eq.trim_start();
+                let first_arg = split_lua_args(val_part.trim_end_matches('}'))
+                    .into_iter()
+                    .next()?;
+                if let Some(s) = unquote_lua_string(&first_arg) {
+                    return Some(s);
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Pure-Rust fallback parser for Lua Hyprland bindings (`kaye.bind`, `kaye.rebind`,
+/// `hl.bind`, `hl.unbind`) when the `lua` interpreter is unavailable.
+pub fn parse_lua_bindings_text(raw: &str, rows: &mut Vec<KeybindingRow>) {
+    let cleaned = strip_lua_comments(raw);
+    let bytes = cleaned.as_bytes();
+    let calls = ["kaye.rebind(", "kaye.bind(", "hl.unbind(", "hl.bind("];
+    let mut i = 0;
+
+    while i < bytes.len() {
+        let matched = calls
+            .iter()
+            .find(|prefix| cleaned[i..].starts_with(*prefix))
+            .copied();
+
+        let Some(call_name) = matched else {
+            let ch = cleaned[i..].chars().next().unwrap();
+            i += ch.len_utf8();
+            continue;
+        };
+
+        // Ensure we didn't match inside a longer identifier (e.g. `mykaye.bind(`).
+        if i > 0 {
+            let prev = cleaned[..i].chars().next_back().unwrap_or(' ');
+            if prev.is_alphanumeric() || prev == '_' {
+                i += 1;
                 continue;
             }
-            let Some((_, rhs)) = trimmed.split_once('=') else {
+        }
+
+        let args_start = i + call_name.len();
+        let rest = &cleaned[args_start..];
+        let chars: Vec<(usize, char)> = rest.char_indices().collect();
+        let mut depth = 1usize;
+        let mut idx = 0usize;
+        let mut args_end = None;
+
+        while idx < chars.len() {
+            let (byte_pos, c) = chars[idx];
+            if c == '"' || c == '\'' {
+                let quote = c;
+                idx += 1;
+                while idx < chars.len() {
+                    let (_, ch) = chars[idx];
+                    idx += 1;
+                    if ch == '\\' && idx < chars.len() {
+                        idx += 1;
+                    } else if ch == quote {
+                        break;
+                    }
+                }
                 continue;
-            };
-            let parts: Vec<&str> = rhs.split(',').map(|p| p.trim()).collect();
-            if trimmed.starts_with("bindd") && parts.len() >= 4 {
-                rows.push(KeybindingRow {
-                    keys: format!("{} + {}", parts[0], parts[1]),
-                    description: parts[2].to_string(),
-                    command: parts[3..].join(", "),
-                });
-            } else if parts.len() >= 3 {
-                rows.push(KeybindingRow {
-                    keys: format!("{} + {}", parts[0], parts[1]),
-                    description: parts[2..].join(", "),
-                    command: parts[2..].join(", "),
-                });
             }
+            if c == '[' && idx + 1 < chars.len() && chars[idx + 1].1 == '[' {
+                idx += 2;
+                while idx < chars.len() {
+                    if chars[idx].1 == ']' && idx + 1 < chars.len() && chars[idx + 1].1 == ']' {
+                        idx += 2;
+                        break;
+                    }
+                    idx += 1;
+                }
+                continue;
+            }
+            if c == '(' {
+                depth += 1;
+            } else if c == ')' {
+                depth -= 1;
+                if depth == 0 {
+                    args_end = Some(byte_pos);
+                    break;
+                }
+            }
+            idx += 1;
+        }
+
+        let Some(rel_end) = args_end else {
+            break;
+        };
+        let arg_slice = &rest[..rel_end];
+        let args = split_lua_args(arg_slice);
+
+        match call_name {
+            "hl.unbind(" => {
+                if let Some(keys) = args.first().and_then(|a| unquote_lua_string(a)) {
+                    let target = normalize_key_chord(&keys);
+                    rows.retain(|r| normalize_key_chord(&r.keys) != target);
+                }
+            }
+            "kaye.bind(" | "kaye.rebind(" => {
+                if args.len() >= 3 {
+                    if let Some(keys) = unquote_lua_string(&args[0]) {
+                        if call_name == "kaye.rebind(" {
+                            let target = normalize_key_chord(&keys);
+                            rows.retain(|r| normalize_key_chord(&r.keys) != target);
+                        }
+                        let description =
+                            unquote_lua_string(&args[1]).unwrap_or_else(|| args[1].clone());
+                        let command =
+                            unquote_lua_string(&args[2]).unwrap_or_else(|| args[2].clone());
+                        rows.push(KeybindingRow {
+                            keys,
+                            description: if description.is_empty() {
+                                command.clone()
+                            } else {
+                                description
+                            },
+                            command,
+                        });
+                    }
+                }
+            }
+            "hl.bind(" if args.len() >= 2 => {
+                if let Some(keys) = unquote_lua_string(&args[0]) {
+                    let command = unquote_lua_string(&args[1]).unwrap_or_else(|| args[1].clone());
+                    let description = args
+                        .get(2)
+                        .and_then(|o| extract_lua_opt_description(o))
+                        .unwrap_or_else(|| command.clone());
+                    rows.push(KeybindingRow {
+                        keys,
+                        description,
+                        command,
+                    });
+                }
+            }
+            _ => {}
+        }
+
+        i = args_start + rel_end + 1;
+    }
+}
+
+/// Legacy Hyprlang `.conf` binding parser (`bindd` / `bind`) kept as fallback.
+pub fn parse_conf_bindings_text(raw: &str, rows: &mut Vec<KeybindingRow>) {
+    for line in raw.lines() {
+        let trimmed = line.trim();
+        if !(trimmed.starts_with("bindd") || trimmed.starts_with("bind "))
+            && !trimmed.starts_with("bind=")
+            && !trimmed.starts_with("bindd=")
+        {
+            continue;
+        }
+        let Some((_, rhs)) = trimmed.split_once('=') else {
+            continue;
+        };
+        let parts: Vec<&str> = rhs.split(',').map(|p| p.trim()).collect();
+        if trimmed.starts_with("bindd") && parts.len() >= 4 {
+            rows.push(KeybindingRow {
+                keys: format!("{} + {}", parts[0], parts[1]),
+                description: parts[2].to_string(),
+                command: parts[3..].join(", "),
+            });
+        } else if parts.len() >= 3 {
+            rows.push(KeybindingRow {
+                keys: format!("{} + {}", parts[0], parts[1]),
+                description: parts[2..].join(", "),
+                command: parts[2..].join(", "),
+            });
+        }
+    }
+}
+
+pub fn list_keybindings() -> Result<Vec<KeybindingRow>> {
+    let kaye_root = config::kaye_root()?;
+    let hypr_dir = hypr_config_dir()?;
+
+    let default_lua = kaye_root.join("default/hypr/bindings.lua");
+    let user_lua = hypr_dir.join("bindings.lua");
+
+    if default_lua.is_file() || user_lua.is_file() {
+        if let Some(rows) =
+            eval_lua_keybindings(&kaye_root, user_lua.is_file().then_some(user_lua.as_path()))
+        {
+            if !rows.is_empty() {
+                return Ok(rows);
+            }
+        }
+
+        let mut rows = Vec::new();
+        if default_lua.is_file() {
+            let raw = fs::read_to_string(&default_lua)?;
+            parse_lua_bindings_text(&raw, &mut rows);
+        }
+        if user_lua.is_file() {
+            let raw = fs::read_to_string(&user_lua)?;
+            parse_lua_bindings_text(&raw, &mut rows);
+        }
+        return Ok(rows);
+    }
+
+    // Legacy `.conf` fallback
+    let mut rows = Vec::new();
+    for file in [
+        kaye_root.join("default/hypr/bindings.conf"),
+        hypr_dir.join("bindings.conf"),
+    ] {
+        if file.is_file() {
+            let raw = fs::read_to_string(&file)?;
+            parse_conf_bindings_text(&raw, &mut rows);
         }
     }
     Ok(rows)
@@ -582,5 +1121,96 @@ mod tests {
         let subseq = fuzzy_score("fire", "File Reader").unwrap();
         assert!(exact > subseq);
         assert!(fuzzy_score("zzz", "Firefox").is_none());
+    }
+
+    #[test]
+    fn parses_lua_bindings_rebind_and_unbind() {
+        let raw = r#"
+-- Commented bind should be ignored:
+-- kaye.bind("SUPER + Z", "Ignored", "true")
+kaye.bind("SUPER + SPACE", "Kaye Menu", kaye.ipc("menu", "toggle", "root"))
+kaye.bind("SUPER + RETURN", "Open Terminal", kaye.launch("foot"))
+kaye.bind("SUPER + B", "Open Browser", kaye.launch("xdg-open https://"))
+hl.bind("SUPER + M", hl.dsp.window.close(), { description = "Close Window" })
+kaye.rebind("SUPER + RETURN", "Open Custom Terminal", "alacritty")
+hl.unbind("SUPER + B")
+"#;
+        let mut rows = Vec::new();
+        parse_lua_bindings_text(raw, &mut rows);
+        assert_eq!(rows.len(), 3);
+        assert_eq!(rows[0].keys, "SUPER + SPACE");
+        assert_eq!(rows[0].description, "Kaye Menu");
+        assert_eq!(rows[1].keys, "SUPER + M");
+        assert_eq!(rows[1].description, "Close Window");
+        assert_eq!(rows[2].keys, "SUPER + RETURN");
+        assert_eq!(rows[2].description, "Open Custom Terminal");
+        assert_eq!(rows[2].command, "alacritty");
+    }
+
+    #[test]
+    fn parses_legacy_conf_bindings_fallback() {
+        let raw = "bindd = SUPER, Q, Close Active Window, killactive,\n";
+        let mut rows = Vec::new();
+        parse_conf_bindings_text(raw, &mut rows);
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].keys, "SUPER + Q");
+        assert_eq!(rows[0].description, "Close Active Window");
+    }
+
+    #[test]
+    fn evaluates_repo_lua_bindings_end_to_end() {
+        let kaye_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
+        let rows = eval_lua_keybindings(&kaye_root, None)
+            .expect("lua interpreter should evaluate default/hypr/bindings.lua");
+        assert!(
+            rows.iter()
+                .any(|r| r.keys == "SUPER + SPACE" && r.description == "Kaye Menu"),
+            "missing SUPER + SPACE binding"
+        );
+        assert!(
+            rows.iter()
+                .any(|r| r.keys == "SUPER + RETURN" && r.description == "Open Terminal"),
+            "missing SUPER + RETURN binding"
+        );
+        assert!(
+            rows.iter()
+                .any(|r| r.keys == "SUPER + Q" && r.description == "Close Active Window"),
+            "missing SUPER + Q binding"
+        );
+        assert!(
+            rows.iter()
+                .any(|r| r.keys == "SUPER + 9" && r.description == "Workspace 9"),
+            "missing expanded workspace loop binding"
+        );
+        assert!(
+            rows.iter()
+                .any(|r| r.keys == "SUPER + SHIFT + 9" && r.description == "Move to Workspace 9"),
+            "missing expanded move-to-workspace loop binding"
+        );
+
+        let tmp_override =
+            env::temp_dir().join(format!("kaye-bindings-test-{}.lua", std::process::id()));
+        fs::write(
+            &tmp_override,
+            r#"
+kaye.rebind("SUPER + E", "Open Yazi", kaye.launch("foot -e yazi"))
+hl.unbind("SUPER + B")
+"#,
+        )
+        .unwrap();
+        let overridden = eval_lua_keybindings(&kaye_root, Some(&tmp_override))
+            .expect("lua interpreter should evaluate user override");
+        let _ = fs::remove_file(&tmp_override);
+
+        assert!(
+            overridden
+                .iter()
+                .any(|r| r.keys == "SUPER + E" && r.description == "Open Yazi"),
+            "expected kaye.rebind override for SUPER + E"
+        );
+        assert!(
+            !overridden.iter().any(|r| r.keys == "SUPER + B"),
+            "expected hl.unbind to remove SUPER + B"
+        );
     }
 }

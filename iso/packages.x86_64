@@ -1,0 +1,10 @@
+# Additional packages merged onto Arch Linux releng for Kaye OS Live Installer
+btrfs-progs
+cryptsetup
+dosfstools
+efibootmgr
+git
+gptfdisk
+gum
+jq
+limine

@@ -1,0 +1,14 @@
+-- Personal input overrides (loaded after $KAYE_PATH/default/hypr/input.lua)
+-- See https://wiki.hypr.land/Configuring/Variables/#input
+--
+-- Example:
+-- hl.config({
+--   input = {
+--     kb_layout = "us",
+--     repeat_rate = 40,
+--     repeat_delay = 250,
+--     touchpad = {
+--       natural_scroll = true,
+--     },
+--   },
+-- })

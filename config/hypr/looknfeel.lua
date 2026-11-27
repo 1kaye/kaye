@@ -1,0 +1,14 @@
+-- Personal look & feel overrides (loaded after $KAYE_PATH/default/hypr/looknfeel.lua and active theme)
+-- See https://wiki.hypr.land/Configuring/Variables/
+--
+-- Example:
+-- hl.config({
+--   general = {
+--     gaps_in = 4,
+--     gaps_out = 8,
+--     border_size = 2,
+--   },
+--   decoration = {
+--     rounding = 8,
+--   },
+-- })

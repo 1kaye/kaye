@@ -1,0 +1,15 @@
+███   ███   ▄█████▄   ███   ███  █████████
+███  ███   ███   ███  ███   ███  ███
+███ ███    ███   ███  ███   ███  ███
+██████     █████████   ▀█████▀   ███████
+███ ███    ███   ███     ███     ███
+███  ███   ███   ███     ███     ███
+███   ███  ███   ███     ███     █████████
+
+Welcome to the Kaye OS Live Installer (Arch Linux x86_64)
+
+  • Start / restart installer : kaye-iso-installer
+  • Unattended install        : /opt/kaye/arch-install.sh --config /path/to/kaye.env --unattended
+  • Configure Wi-Fi           : iwctl
+  • Installer log             : /var/log/kaye-arch-install.log
+

@@ -301,4 +301,28 @@ background = "#1e1e2e"
             "mode=dark hex=#89b4fa strip=89b4fa rgb=30,30,46 unknown={{ nope }}"
         );
     }
+
+    #[test]
+    fn hyprland_lua_template_renders_cleanly_for_all_bundled_themes() {
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
+        let tpl = fs::read_to_string(repo_root.join("default/themed/hyprland.lua.tpl"))
+            .expect("hyprland.lua.tpl should exist");
+
+        for theme_slug in ["catppuccin", "gruvbox", "tokyo-night"] {
+            let raw = fs::read_to_string(
+                repo_root
+                    .join("themes")
+                    .join(theme_slug)
+                    .join("colors.toml"),
+            )
+            .expect("bundled theme colors.toml should exist");
+            let colors = parse_colors_toml(&raw).expect("valid colors.toml");
+            let rendered = render_template(&tpl, &colors);
+            assert!(
+                !rendered.contains("{{"),
+                "unresolved placeholder in rendered hyprland.lua for {theme_slug}: {rendered}"
+            );
+            assert!(rendered.contains("hl.config("));
+        }
+    }
 }

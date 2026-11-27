@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Kaye OS Live ISO Installer Launcher
+# Invoked automatically on tty1 via /root/.zlogin or manually from the live shell.
+
+readonly INSTALLER="/opt/kaye/arch-install.sh"
+
+on_interrupt() {
+  printf '\n[Kaye OS] Installer interrupted. Dropping to live shell.\n'
+  printf 'Run "kaye-iso-installer" anytime to restart, or "iwctl" to configure Wi-Fi.\n\n'
+  exit 0
+}
+
+trap on_interrupt INT
+
+main() {
+  if [[ ! -f "$INSTALLER" ]]; then
+    printf '[Kaye OS] Error: Bundled installer not found at %s\n' "$INSTALLER" >&2
+    printf 'You can fetch it online once connected:\n' >&2
+    printf '  curl -fsSL https://raw.githubusercontent.com/1kaye/kaye/main/arch-install.sh | bash\n' >&2
+    exit 0
+  fi
+
+  if [[ -t 1 ]]; then
+    clear || true
+  fi
+
+  local rc=0
+  bash "$INSTALLER" "$@" || rc=$?
+
+  if [[ "$rc" -ne 0 ]]; then
+    printf '\n[Kaye OS] Installer exited with status %d. Dropping to live shell.\n' "$rc"
+    printf '  • Restart installer : kaye-iso-installer\n'
+    printf '  • Configure Wi-Fi   : iwctl\n'
+    printf '  • Inspect log       : less /var/log/kaye-arch-install.log\n\n'
+  fi
+
+  exit 0
+}
+
+main "$@"

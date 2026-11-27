@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Kaye OS First-Run Setup
+Comment=Applies user session desktop defaults on first Hyprland login
+Exec=/usr/bin/bash -c 'exec "$HOME/.local/bin/kaye-first-run"'
+OnlyShowIn=Hyprland;
+X-GNOME-Autostart-enabled=true
+NoDisplay=true
