@@ -1,0 +1,47 @@
+{
+  // Kaye OS Super+Space Menu Definition (JSONC)
+  // Dotted IDs automatically form the submenu hierarchy.
+  // Personal overrides go in ~/.config/kaye/menu.jsonc.
+
+  // Root
+  "apps":       { "icon": "󰀻", "label": "Apps",       "aliases": ["app", "launcher"], "provider": "apps" },
+  "appearance": { "icon": "󰏘", "label": "Appearance", "aliases": ["style", "theme"] },
+  "trigger":    { "icon": "󱓞", "label": "Trigger",    "aliases": ["toggle", "capture"] },
+  "setup":      { "icon": "", "label": "Setup",      "aliases": ["settings"] },
+  "update":     { "icon": "", "label": "Update",     "description": "Snapshot + Pacman/AUR update", "action": "foot -e bash -lc 'kaye update; read -n1 -p \"Press any key...\"'" },
+  "system":     { "icon": "", "label": "System",     "aliases": ["power"] },
+
+  // Appearance
+  "appearance.theme":              { "icon": "󰸌", "label": "Theme",        "aliases": ["themes"], "provider": "themes" },
+  "appearance.background":         { "icon": "", "label": "Wallpaper",    "aliases": ["background"], "provider": "backgrounds" },
+  "appearance.bar":                { "icon": "󰍜", "label": "Bar" },
+  "appearance.bar.toggle":         { "icon": "󰈉", "label": "Show / Hide Bar", "action": "kaye bar toggle" },
+  "appearance.bar.top":            { "icon": "󰁝", "label": "Top Bar",      "action": "kaye bar position top" },
+  "appearance.bar.bottom":         { "icon": "󰁅", "label": "Bottom Bar",   "action": "kaye bar position bottom" },
+  "appearance.bar.opaque":         { "icon": "󰝤", "label": "Opaque Bar",   "action": "kaye bar background opaque" },
+  "appearance.bar.glassy":         { "icon": "󰂵", "label": "Glassy Bar",   "action": "kaye bar background glassy" },
+  "appearance.bar.clear":          { "icon": "󰝣", "label": "Clear Bar",    "action": "kaye bar background none" },
+
+  // Trigger / Toggles
+  "trigger.stay-awake":  { "icon": "", "label": "Toggle Stay Awake",     "action": "kaye toggle stay-awake" },
+  "trigger.nightlight":  { "icon": "󰔎", "label": "Toggle Night Light",    "action": "kaye toggle nightlight" },
+  "trigger.dnd":         { "icon": "󰂛", "label": "Toggle Do Not Disturb", "action": "kaye toggle dnd" },
+  "trigger.screenshot":  { "icon": "󰄀", "label": "Screenshot Region",     "action": "bash -c 'grim -g \"$(slurp)\" - | wl-copy'" },
+  "trigger.colorpicker": { "icon": "󰈋", "label": "Color Picker",          "action": "hyprpicker -a" },
+
+  // Setup
+  "setup.wifi":       { "icon": "󰤨", "label": "Network (nmtui)",   "action": "foot -e nmtui" },
+  "setup.bluetooth":  { "icon": "󰂯", "label": "Bluetooth",         "action": "foot -e bluetoothctl" },
+  "setup.audio":      { "icon": "󰕾", "label": "Audio (btop/wire)", "action": "foot -e wpctl status" },
+  "setup.shell-logs": { "icon": "󰌱", "label": "Kaye Shell Logs",   "action": "foot -e bash -lc 'kaye shell logs; read -n1 -p \"Press any key...\"'" },
+  "setup.reload":     { "icon": "󰑓", "label": "Reload Kaye Shell", "action": "kaye shell reload" },
+
+  // System
+  "system.about":     { "icon": "", "label": "About Kaye OS", "aliases": ["about"], "action": "foot -e bash -lc 'kaye about; echo; fastfetch; read -n1 -p \"Press any key...\"'" },
+  "system.snapshots": { "icon": "󰁯", "label": "Snapshots",     "provider": "snapshots" },
+  "system.lock":      { "icon": "", "label": "Lock",          "action": "qs -p $KAYE_PATH/shell ipc call lock open" },
+  "system.suspend":   { "icon": "󰒲", "label": "Suspend",       "action": "systemctl suspend" },
+  "system.logout":    { "icon": "󰍃", "label": "Logout",        "action": "uwsm stop" },
+  "system.reboot":    { "icon": "󰜉", "label": "Reboot",        "action": "systemctl reboot" },
+  "system.shutdown":  { "icon": "󰐥", "label": "Shutdown",      "action": "systemctl poweroff" },
+}

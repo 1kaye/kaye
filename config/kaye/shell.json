@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "idle": {
+    "screensaver": 180,
+    "lock": 300
+  },
+  "bar": {
+    "position": "top",
+    "background": "opaque",
+    "hidden": false,
+    "height": 30,
+    "showIntro": true
+  }
+}

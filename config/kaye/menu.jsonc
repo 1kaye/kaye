@@ -1,0 +1,5 @@
+{
+  // Add or override Kaye Super+Space menu entries here.
+  // Example:
+  // "trigger.notes": { "icon": "󰠮", "label": "Open Notes", "action": "foot -e nvim ~/Notes" }
+}

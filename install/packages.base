@@ -1,0 +1,98 @@
+# Kaye OS — Official Arch Repository Packages
+# Base & Recovery
+base-devel
+git
+pacman-contrib
+snapper
+zram-generator
+reflector
+ufw
+plymouth
+
+# Wayland, Hyprland, UWSM & Portals
+hyprland
+uwsm
+xdg-desktop-portal-hyprland
+xdg-desktop-portal-gtk
+polkit-gnome
+gnome-keyring
+libsecret
+qt5-wayland
+qt6-wayland
+
+# Audio (PipeWire)
+pipewire
+pipewire-alsa
+pipewire-pulse
+pipewire-jack
+wireplumber
+pamixer
+
+# Quickshell Runtime (Qt6)
+qt6-base
+qt6-declarative
+qt6-svg
+qt6-multimedia
+qt6-multimedia-ffmpeg
+qt6-imageformats
+
+# Hardware Utilities
+bluez
+bluez-utils
+power-profiles-daemon
+brightnessctl
+
+# Terminal, Fonts & Theming
+foot
+ttf-jetbrains-mono-nerd
+noto-fonts
+noto-fonts-cjk
+noto-fonts-emoji
+fontconfig
+adw-gtk-theme
+qt6ct
+
+# Desktop Utilities
+wl-clipboard
+cliphist
+grim
+slurp
+hyprpicker
+hyprsunset
+mpv
+imv
+ffmpeg
+ffmpegthumbnailer
+imagemagick
+librsvg
+gvfs
+gvfs-mtp
+gvfs-smb
+udiskie
+exfatprogs
+dosfstools
+ntfs-3g
+thunar
+tumbler
+fastfetch
+
+# Rust Toolchain, CLI & Developer Tools
+rustup
+github-cli
+jq
+fd
+ripgrep
+fzf
+bat
+eza
+zoxide
+btop
+lazygit
+neovim
+starship
+tmux
+yazi
+unzip
+man-db
+less
+plocate

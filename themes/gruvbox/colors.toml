@@ -1,0 +1,21 @@
+mode = "dark"
+
+accent = "#d79921"
+selection = "#504945"
+muted = "#665c54"
+
+background = "#282828"
+dark_background = "#1d2021"
+lighter_background = "#3c3836"
+
+foreground = "#ebdbb2"
+dark_foreground = "#928374"
+bright_foreground = "#fbf1c7"
+
+red = "#fb4934"
+yellow = "#fabd2f"
+orange = "#fe8019"
+green = "#b8bb26"
+cyan = "#8ec07c"
+blue = "#83a598"
+magenta = "#d3869b"

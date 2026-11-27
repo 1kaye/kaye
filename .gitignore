@@ -1,0 +1,8 @@
+# Rust build artifacts
+core/target/
+
+# Local backups & temporary files
+*.bak
+*.bak.*
+*.tmp
+.DS_Store

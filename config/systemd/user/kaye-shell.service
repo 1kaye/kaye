@@ -1,0 +1,14 @@
+[Unit]
+Description=Kaye OS Quickshell Desktop
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Service]
+Environment=KAYE_PATH=%h/kaye
+Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin
+ExecStart=/usr/bin/quickshell -p %h/kaye/shell
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=graphical-session.target
