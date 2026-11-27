@@ -183,7 +183,7 @@ kaye_ui_header "Installing Kaye OS ($TOTAL_STEPS steps)"
 
 step_index=0
 for entry in "${STEPS[@]}"; do
-  ((step_index++))
+  step_index=$((step_index + 1))
   script_name="${entry%%|*}"
   step_label="${entry#*|}"
   kaye_run_step "$step_index" "$TOTAL_STEPS" "$step_label" "$KAYE_DIR/install/$script_name"

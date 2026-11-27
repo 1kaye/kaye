@@ -209,9 +209,12 @@ cleanup() {
     CIDATA_TMP_CFG=""
   fi
 
-  # If aborted/failed while mounts or LUKS are open, cleanly release them so re-runs work
+  # If aborted/failed while mounts or LUKS are open, preserve logs and cleanly release them
   if [[ "$exit_code" -ne 0 ]]; then
     if [[ "$MOUNTED" -eq 1 ]]; then
+      if [[ -f "$INSTALL_LOG" && -d /mnt/var/log ]]; then
+        cp "$INSTALL_LOG" /mnt/var/log/kaye-arch-install.log 2>/dev/null || true
+      fi
       sync || true
       umount -R /mnt 2>/dev/null || true
       MOUNTED=0
@@ -1415,7 +1418,7 @@ step_install_kaye_desktop() {
   fi
 
   arch-chroot /mnt chown -R "${TARGET_USER}:${TARGET_USER}" "/home/${TARGET_USER}/kaye"
-  chmod +x "$target_kaye_dir"/install/*.sh 2>/dev/null || true
+  chmod +x "$target_kaye_dir"/boot.sh "$target_kaye_dir"/install/*.sh "$target_kaye_dir"/install/lib/*.sh 2>/dev/null || true
 
   # Pre-create chroot install log writable by TARGET_USER
   touch /mnt/var/log/kaye-install.log

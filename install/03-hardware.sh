@@ -69,11 +69,16 @@ if grep -qi 'NVIDIA' <<<"$GPU_INFO"; then
   add_unique KMS_MODULES nvidia nvidia_modeset nvidia_uvm nvidia_drm
 fi
 
+if grep -qiE 'Virtio|QXL|VMware|VirtualBox|Bochs|Red Hat|QEMU' <<<"$GPU_INFO"; then
+  echo "==> Detected virtualized GPU (VM)"
+  add_unique PKGS mesa vulkan-virtio vulkan-swrast
+fi
+
 if (( ${#PKGS[@]} > 0 )); then
   echo "==> Installing hardware packages: ${PKGS[*]}"
   sudo pacman -S --needed --noconfirm "${PKGS[@]}"
 else
-  echo "==> No extra hardware packages detected (likely VM)."
+  echo "==> No extra hardware packages detected."
 fi
 
 # 3. Write additive early KMS drop-in for mkinitcpio (rebuilt in 04-boot-and-plymouth.sh).

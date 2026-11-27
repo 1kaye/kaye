@@ -34,7 +34,8 @@ pipewire-jack
 wireplumber
 pamixer
 
-# Quickshell Runtime (Qt6)
+# Quickshell & Qt6 Runtime
+quickshell
 qt6-base
 qt6-declarative
 qt6-svg

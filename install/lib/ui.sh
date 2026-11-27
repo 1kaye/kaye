@@ -137,7 +137,7 @@ kaye_ui_choose() {
   local i=1 opt
   for opt in "${options[@]}"; do
     printf '  %d) %s\n' "$i" "$opt" >&2
-    ((i++))
+    i=$((i + 1))
   done
   local choice=""
   read -r -p "Select [1-${#options[@]}] (default: $default_val): " choice || true

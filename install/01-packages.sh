@@ -36,7 +36,7 @@ if [[ -f /etc/pacman.conf ]]; then
   fi
 fi
 
-mapfile -t BASE_PKGS < <(grep -Ev '^\s*(#|$)' "$KAYE_DIR/install/packages.base")
+mapfile -t BASE_PKGS < <(grep -Ev '^\s*(#|$)' "$KAYE_DIR/install/packages.base" || true)
 
 KAYE_BROWSER="${KAYE_BROWSER:-firefox}"
 case "$KAYE_BROWSER" in
@@ -57,24 +57,36 @@ esac
 echo "==> Installing ${#BASE_PKGS[@]} official Arch packages..."
 sudo pacman -Syu --needed --noconfirm "${BASE_PKGS[@]}"
 
+AUR_PKGS=()
+if [[ -f "$KAYE_DIR/install/packages.aur" ]]; then
+  mapfile -t AUR_PKGS < <(grep -Ev '^\s*(#|$)' "$KAYE_DIR/install/packages.aur" || true)
+fi
+
 # Build yay-bin from AUR as non-root user if yay is missing.
 if ! command -v yay >/dev/null 2>&1; then
   echo "==> Building yay-bin from AUR..."
   tmp_yay="$(mktemp -d)"
+  yay_rc=0
   (
     trap 'rm -rf "$tmp_yay"' EXIT
     git clone --depth 1 https://aur.archlinux.org/yay-bin.git "$tmp_yay/yay-bin"
     cd "$tmp_yay/yay-bin"
     makepkg -si --noconfirm
-  )
+  ) || yay_rc=$?
+
+  if (( yay_rc != 0 )); then
+    if (( ${#AUR_PKGS[@]} > 0 )); then
+      echo "Error: failed to build yay-bin and AUR packages are required (${AUR_PKGS[*]})." >&2
+      exit "$yay_rc"
+    else
+      echo "Warning: could not build yay-bin from AUR right now; continuing (no mandatory AUR packages)." >&2
+    fi
+  fi
 fi
 
-if [[ -f "$KAYE_DIR/install/packages.aur" ]]; then
-  mapfile -t AUR_PKGS < <(grep -Ev '^\s*(#|$)' "$KAYE_DIR/install/packages.aur")
-  if (( ${#AUR_PKGS[@]} > 0 )); then
-    echo "==> Installing ${#AUR_PKGS[@]} AUR packages..."
-    yay -S --needed --noconfirm --answerdiff None --answerclean None --removemake "${AUR_PKGS[@]}"
-  fi
+if (( ${#AUR_PKGS[@]} > 0 )); then
+  echo "==> Installing ${#AUR_PKGS[@]} AUR packages..."
+  yay -S --needed --noconfirm --answerdiff None --answerclean None --removemake "${AUR_PKGS[@]}"
 fi
 
 # Ensure Rust stable toolchain is configured for building `core/`.
